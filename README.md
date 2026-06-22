@@ -8,10 +8,8 @@
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/jeffersongoncalves/laravel-discord-logger.svg?style=flat-square)](https://packagist.org/packages/jeffersongoncalves/laravel-discord-logger)
 [![Tests](https://img.shields.io/github/actions/workflow/status/jeffersongoncalves/laravel-discord-logger/run-tests.yml?branch=master&label=tests&style=flat-square)](https://github.com/jeffersongoncalves/laravel-discord-logger/actions/workflows/run-tests.yml)
-[![PHPStan](https://img.shields.io/github/actions/workflow/status/jeffersongoncalves/laravel-discord-logger/phpstan.yml?branch=master&label=phpstan&style=flat-square)](https://github.com/jeffersongoncalves/laravel-discord-logger/actions/workflows/phpstan.yml)
-[![Code Style](https://img.shields.io/github/actions/workflow/status/jeffersongoncalves/laravel-discord-logger/fix-php-code-style-issues.yml?branch=master&label=code%20style&style=flat-square)](https://github.com/jeffersongoncalves/laravel-discord-logger/actions/workflows/fix-php-code-style-issues.yml)
 [![Total Downloads](https://img.shields.io/packagist/dt/jeffersongoncalves/laravel-discord-logger.svg?style=flat-square)](https://packagist.org/packages/jeffersongoncalves/laravel-discord-logger)
-[![License](https://img.shields.io/packagist/l/jeffersongoncalves/laravel-discord-logger.svg?style=flat-square)](LICENSE.md)
+[![License](https://img.shields.io/github/license/jeffersongoncalves/laravel-discord-logger?style=flat-square)](LICENSE.md)
 
 Send Laravel logs to Discord — built for production. A Monolog channel with **deduplication**, **configurable error grouping**, **rate limiting**, **async delivery** with 429 backoff, and a **graceful no-op** when the webhook URL is missing.
 
