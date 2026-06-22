@@ -1,6 +1,6 @@
 <div class="filament-hidden">
 
-![Laravel Discord Logger](https://raw.githubusercontent.com/jeffersongoncalves/laravel-discord-logger/main/art/jeffersongoncalves-laravel-discord-logger.png)
+![Laravel Discord Logger](https://raw.githubusercontent.com/jeffersongoncalves/laravel-discord-logger/master/art/jeffersongoncalves-laravel-discord-logger.png)
 
 </div>
 
