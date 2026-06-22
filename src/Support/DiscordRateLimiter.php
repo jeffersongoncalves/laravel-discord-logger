@@ -2,11 +2,15 @@
 
 namespace JeffersonGoncalves\DiscordLogger\Support;
 
-use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Contracts\Cache\Repository;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Two-tier rate limiter: a global cap on total volume plus a per-fingerprint
  * cap that guards against a single looping error flooding the channel.
+ *
+ * Counters live in the same cache store as the deduplicator (config `store`),
+ * so dedup and rate limiting always agree on where state lives.
  */
 class DiscordRateLimiter
 {
@@ -24,29 +28,32 @@ class DiscordRateLimiter
         $global = (array) ($this->config['rate_limit']['global'] ?? []);
         $perFp = (array) ($this->config['rate_limit']['per_fingerprint'] ?? []);
 
-        if (! $this->within('discord-logger:rl:global', $global['max'] ?? 30, $global['per_seconds'] ?? 60)) {
+        if (! $this->within('global', (int) ($global['max'] ?? 30), (int) ($global['per_seconds'] ?? 60))) {
             return false;
         }
 
-        return $this->within(
-            'discord-logger:rl:fp:'.$fingerprint,
-            $perFp['max'] ?? 1,
-            $perFp['per_seconds'] ?? 300,
-        );
+        return $this->within('fp:'.$fingerprint, (int) ($perFp['max'] ?? 1), (int) ($perFp['per_seconds'] ?? 300));
     }
 
-    private function within(string $key, int $max, int $perSeconds): bool
+    private function within(string $bucket, int $max, int $perSeconds): bool
     {
         if ($max <= 0) {
             return true;
         }
 
-        if (RateLimiter::tooManyAttempts($key, $max)) {
-            return false;
+        $store = $this->store();
+        $key = 'discord-logger:rl:'.$bucket;
+
+        // First hit in the window starts the counter with a fixed TTL.
+        if ($store->add($key, 1, $perSeconds)) {
+            return true;
         }
 
-        RateLimiter::hit($key, $perSeconds);
+        return (int) $store->increment($key) <= $max;
+    }
 
-        return true;
+    private function store(): Repository
+    {
+        return Cache::store($this->config['store'] ?? null);
     }
 }

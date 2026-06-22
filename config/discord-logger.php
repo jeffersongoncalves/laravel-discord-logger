@@ -27,6 +27,68 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Per-level webhooks
+    |--------------------------------------------------------------------------
+    |
+    | Optionally route specific levels to dedicated channels. Any level not
+    | listed here falls back to the channel `url` from config/logging.php.
+    |
+    | e.g. 'CRITICAL' => env('DISCORD_LOGGER_WEBHOOK_ALERTS'),
+    |
+    */
+    'webhooks' => [
+        // 'EMERGENCY' => env('DISCORD_LOGGER_WEBHOOK_ALERTS'),
+        // 'CRITICAL'  => env('DISCORD_LOGGER_WEBHOOK_ALERTS'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Mentions
+    |--------------------------------------------------------------------------
+    |
+    | Prepend a mention to the message for a given level so important errors
+    | actually ping someone. Use '@here', '@everyone', '<@&ROLE_ID>' (role) or
+    | '<@USER_ID>' (user). allowed_mentions is set automatically.
+    |
+    */
+    'mentions' => [
+        // 'EMERGENCY' => '@here',
+        // 'CRITICAL'  => '<@&123456789012345678>',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Context redaction
+    |--------------------------------------------------------------------------
+    |
+    | Case-insensitive key fragments whose values are masked before sending, so
+    | secrets in the log context never leak into Discord.
+    |
+    */
+    'redact' => [
+        'password',
+        'secret',
+        'token',
+        'authorization',
+        'api_key',
+        'apikey',
+    ],
+    'redact_placeholder' => '[REDACTED]',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Fallback channel
+    |--------------------------------------------------------------------------
+    |
+    | If delivery to Discord throws, the error is swallowed (logging must never
+    | break the app). Set a channel name here (e.g. 'single') to record those
+    | failures somewhere instead of losing them silently. null = stay silent.
+    |
+    */
+    'fallback_channel' => env('DISCORD_LOGGER_FALLBACK_CHANNEL'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Converter
     |--------------------------------------------------------------------------
     |

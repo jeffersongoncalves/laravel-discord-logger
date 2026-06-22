@@ -1,16 +1,17 @@
 <?php
 
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\RateLimiter;
+use JeffersonGoncalves\DiscordLogger\Converters\SimpleRecordConverter;
 use JeffersonGoncalves\DiscordLogger\Jobs\SendDiscordMessage;
 
 beforeEach(function () {
     // Send inline so we can assert the actual webhook calls.
     config()->set('discord-logger.queue.enabled', false);
     config()->set('discord-logger.deduplication.summary', false);
-    RateLimiter::clear('discord-logger:rl:global');
+    Cache::flush();
     Http::fake();
 });
 
@@ -92,3 +93,65 @@ it('dispatches a queued job when queue delivery is enabled', function () {
 
     Bus::assertDispatched(SendDiscordMessage::class);
 });
+
+it('enforces the per-fingerprint rate limit independently of dedup', function () {
+    config()->set('discord-logger.deduplication.enabled', false);
+    config()->set('discord-logger.rate_limit.global.max', 100);
+    config()->set('discord-logger.rate_limit.per_fingerprint.max', 1);
+    config()->set('discord-logger.grouping.strategy', 'message');
+    config()->set('discord-logger.grouping.normalize', false);
+
+    Log::channel('discord')->error('looping error');
+    Log::channel('discord')->error('looping error');
+
+    Http::assertSentCount(1);
+});
+
+it('routes a level to its dedicated webhook', function () {
+    $alerts = 'https://discord.com/api/webhooks/alerts/token';
+    config()->set('discord-logger.webhooks.ERROR', $alerts);
+
+    Log::channel('discord')->error('routed');
+
+    Http::assertSent(fn ($request) => $request->url() === $alerts);
+});
+
+it('adds a mention and allowed_mentions for a configured level', function () {
+    config()->set('discord-logger.mentions.ERROR', '@here');
+
+    Log::channel('discord')->error('ping me');
+
+    Http::assertSent(function ($request) {
+        return str_contains($request['content'] ?? '', '@here')
+            && ($request['allowed_mentions']['parse'] ?? []) === ['everyone'];
+    });
+});
+
+it('redacts sensitive context keys before sending', function () {
+    Log::channel('discord')->error('login attempt', [
+        'user' => 'alice',
+        'password' => 'hunter2',
+    ]);
+
+    Http::assertSent(function ($request) {
+        $body = $request->body();
+
+        return str_contains($body, '[REDACTED]') && ! str_contains($body, 'hunter2');
+    });
+});
+
+it('can use the simple converter', function () {
+    config()->set('discord-logger.converter', SimpleRecordConverter::class);
+
+    Log::channel('discord')->error('plain message');
+
+    Http::assertSent(fn ($request) => str_contains($request['content'] ?? '', 'plain message'));
+});
+
+it('never throws when the transport fails and stays silent without a fallback', function () {
+    Http::fake(function () {
+        throw new RuntimeException('network down');
+    });
+
+    Log::channel('discord')->error('boom');
+})->throwsNoExceptions();

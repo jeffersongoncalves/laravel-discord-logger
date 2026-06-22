@@ -2,6 +2,7 @@
 
 namespace JeffersonGoncalves\DiscordLogger\Converters;
 
+use JeffersonGoncalves\DiscordLogger\Support\Redactor;
 use Monolog\LogRecord;
 use Throwable;
 
@@ -10,10 +11,18 @@ use Throwable;
  */
 class RichRecordConverter implements Converter
 {
+    /** Discord hard limit for the combined character count of a single embed. */
+    private const EMBED_MAX = 6000;
+
+    private Redactor $redactor;
+
     /**
      * @param  array<string, mixed>  $config
      */
-    public function __construct(private readonly array $config) {}
+    public function __construct(private readonly array $config)
+    {
+        $this->redactor = Redactor::fromConfig($config);
+    }
 
     public function convert(LogRecord $record): array
     {
@@ -27,11 +36,43 @@ class RichRecordConverter implements Converter
             'fields' => $this->fields($record),
         ];
 
+        $embed = $this->clamp($embed);
+
         return array_filter([
             'username' => $this->config['from']['name'] ?? null,
             'avatar_url' => $this->config['from']['avatar_url'] ?? null,
             'embeds' => [array_filter($embed, fn ($v) => $v !== [])],
         ], fn ($v) => $v !== null);
+    }
+
+    /**
+     * Drop fields from the end until the embed fits within Discord's 6000-char
+     * limit, so an overgrown stacktrace/context never triggers a 400.
+     *
+     * @param  array<string, mixed>  $embed
+     * @return array<string, mixed>
+     */
+    private function clamp(array $embed): array
+    {
+        $fixed = mb_strlen((string) $embed['title']) + mb_strlen((string) $embed['description']);
+
+        /** @var array<int, array<string, mixed>> $fields */
+        $fields = $embed['fields'];
+        $kept = [];
+        $running = $fixed;
+
+        foreach ($fields as $field) {
+            $size = mb_strlen((string) $field['name']) + mb_strlen((string) $field['value']);
+            if ($running + $size > self::EMBED_MAX) {
+                break;
+            }
+            $running += $size;
+            $kept[] = $field;
+        }
+
+        $embed['fields'] = $kept;
+
+        return $embed;
     }
 
     public function title(LogRecord $record): string
@@ -74,7 +115,7 @@ class RichRecordConverter implements Converter
         if ($context !== []) {
             $fields[] = [
                 'name' => 'Context',
-                'value' => $this->code($this->json($context)),
+                'value' => $this->code($this->json($this->redactor->scrub($context))),
             ];
         }
 
@@ -109,7 +150,7 @@ class RichRecordConverter implements Converter
     }
 
     /**
-     * @param  array<string, mixed>  $value
+     * @param  array<array-key, mixed>  $value
      */
     private function json(array $value): string
     {

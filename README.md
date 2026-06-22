@@ -84,6 +84,42 @@ Delivery runs through a queued job by default (`queue.enabled`). Discord 429s ar
 
 Dedup + rate-limit counters live in the cache store named by `store` (null = default). **Use Redis in production** for atomic counters.
 
+### Per-level webhooks & mentions
+
+Route a level to its own channel and ping someone when it matters:
+
+```php
+'webhooks' => [
+    'EMERGENCY' => env('DISCORD_LOGGER_WEBHOOK_ALERTS'),
+    'CRITICAL'  => env('DISCORD_LOGGER_WEBHOOK_ALERTS'),
+],
+
+'mentions' => [
+    'EMERGENCY' => '@here',
+    'CRITICAL'  => '<@&123456789012345678>', // role id
+],
+```
+
+`allowed_mentions` is set automatically, so `@here` / `@everyone` / role / user pings actually fire.
+
+### Context redaction
+
+Sensitive context keys are masked before sending — configure with `redact` (case-insensitive key fragments). Defaults cover `password`, `secret`, `token`, `authorization`, `api_key`.
+
+### Fallback channel & safety
+
+The handler **never throws** and is guarded against logging-while-logging recursion. If delivery throws, the error is swallowed; set `fallback_channel` (e.g. `'single'`) to record those failures instead of losing them.
+
+## Commands
+
+```bash
+# Publish the config + optionally star the repo
+php artisan discord-logger:install
+
+# Send a test message to verify the webhook
+php artisan discord-logger:test --channel=discord
+```
+
 ## Testing
 
 ```bash
