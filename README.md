@@ -7,19 +7,13 @@
 # Laravel Discord Logger
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/jeffersongoncalves/laravel-discord-logger.svg?style=flat-square)](https://packagist.org/packages/jeffersongoncalves/laravel-discord-logger)
+[![Tests](https://img.shields.io/github/actions/workflow/status/jeffersongoncalves/laravel-discord-logger/run-tests.yml?branch=master&label=tests&style=flat-square)](https://github.com/jeffersongoncalves/laravel-discord-logger/actions/workflows/run-tests.yml)
+[![PHPStan](https://img.shields.io/github/actions/workflow/status/jeffersongoncalves/laravel-discord-logger/phpstan.yml?branch=master&label=phpstan&style=flat-square)](https://github.com/jeffersongoncalves/laravel-discord-logger/actions/workflows/phpstan.yml)
+[![Code Style](https://img.shields.io/github/actions/workflow/status/jeffersongoncalves/laravel-discord-logger/fix-php-code-style-issues.yml?branch=master&label=code%20style&style=flat-square)](https://github.com/jeffersongoncalves/laravel-discord-logger/actions/workflows/fix-php-code-style-issues.yml)
 [![Total Downloads](https://img.shields.io/packagist/dt/jeffersongoncalves/laravel-discord-logger.svg?style=flat-square)](https://packagist.org/packages/jeffersongoncalves/laravel-discord-logger)
 [![License](https://img.shields.io/packagist/l/jeffersongoncalves/laravel-discord-logger.svg?style=flat-square)](LICENSE.md)
 
 Send Laravel logs to Discord — built for production. A Monolog channel with **deduplication**, **configurable error grouping**, **rate limiting**, **async delivery** with 429 backoff, and a **graceful no-op** when the webhook URL is missing.
-
-## Why this instead of `marvinlabs/laravel-discord-logger`?
-
-| Pain | This package |
-|------|--------------|
-| The same error pings you dozens of times a day | Deduplication collapses repeats inside a window into a single message + a "occurred N×" roll-up |
-| No control over what counts as "the same error" | Configurable grouping: `message`, `level_message`, `exception`, or a custom callback — plus message normalization |
-| No real rate limiting → Discord 429s | Two-tier rate limit (global + per-fingerprint) and queued delivery that honours `Retry-After` |
-| Crashes locally/in tests when the webhook env var is unset | Empty URL or `enabled=false` → silent no-op; the handler **never throws** |
 
 ## Installation
 
