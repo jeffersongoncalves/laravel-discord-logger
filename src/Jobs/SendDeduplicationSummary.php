@@ -24,8 +24,12 @@ class SendDeduplicationSummary extends DiscordJob
         public array $config,
     ) {}
 
-    public function handle(Deduplicator $deduplicator, DiscordWebhook $transport): void
+    public function handle(DiscordWebhook $transport): void
     {
+        // Build from the carried config: Deduplicator requires `array $config`,
+        // which the container cannot autowire on the queue worker.
+        $deduplicator = new Deduplicator($this->config);
+
         $occurrences = $deduplicator->occurrences($this->fingerprint);
         $deduplicator->forget($this->fingerprint);
 
