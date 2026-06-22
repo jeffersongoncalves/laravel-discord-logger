@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-discord-logger` will be documented in this file.
 
+## v1.1.1 - 2026-06-22
+
+### Fixed
+
+- Resolve `BindingResolutionException` thrown by the queued `SendDeduplicationSummary` job. The worker invoked `handle()` through the container, which tried to autowire `Deduplicator` — whose constructor requires an unbound `array $config`. The job now builds the deduplicator from the config it already carries.
+
+This only surfaced in production (queue + deduplication + summary all enabled) when the dedup window closed and the delayed job ran. Added a regression test that executes `handle()` via the container (the queue path), which the existing `Queue::fake` tests never exercised.
+
 ## v1.1.0 - 2026-06-22
 
 ### What's new
