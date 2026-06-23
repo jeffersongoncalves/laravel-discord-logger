@@ -17,6 +17,18 @@ it('releases the job with backoff on a 429', function () {
     $job->handle(app(DiscordWebhook::class));
 });
 
+it('releases the job using the Retry-After header on a 429', function () {
+    Http::fake(['*' => Http::response('', 429, ['Retry-After' => '7'])]);
+
+    $job = new SendDiscordMessage('https://discord.com/api/webhooks/x/y', ['content' => 'x']);
+
+    $queueJob = Mockery::mock(JobContract::class);
+    $queueJob->shouldReceive('release')->once()->with(7);
+    $job->setJob($queueJob);
+
+    $job->handle(app(DiscordWebhook::class));
+});
+
 it('fails fast on a 4xx client error', function () {
     Http::fake(['*' => Http::response('not found', 404)]);
 

@@ -104,7 +104,10 @@ Route a level to its own channel and ping someone when it matters:
 
 ### Context redaction
 
-Sensitive context keys are masked before sending — configure with `redact` (case-insensitive key fragments). Defaults cover `password`, `secret`, `token`, `authorization`, `api_key`.
+Sensitive data is masked before it ever reaches Discord, via two complementary strategies:
+
+- **Key matching** (`redact`) — case-insensitive key fragments whose values are masked. Defaults cover `password`, `secret`, `token`, `authorization`, `api_key`, `apikey`. Scrubbing recurses into nested arrays **and** the public properties of objects carried in the context.
+- **Value patterns** (`redact_value_patterns`) — PCRE regexes matched against scalar *values*, so a secret leaking under an innocuous key (e.g. `url`, `auth`) — or inside the message text and the stacktrace — is still caught. Defaults cover `Bearer` tokens and JWTs; leave the array empty to disable value-based redaction.
 
 ### Fallback channel & safety
 

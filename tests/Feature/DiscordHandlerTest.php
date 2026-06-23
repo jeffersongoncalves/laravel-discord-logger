@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use JeffersonGoncalves\DiscordLogger\Converters\SimpleRecordConverter;
+use JeffersonGoncalves\DiscordLogger\Jobs\SendDeduplicationSummary;
 use JeffersonGoncalves\DiscordLogger\Jobs\SendDiscordMessage;
 
 beforeEach(function () {
@@ -125,6 +126,84 @@ it('adds a mention and allowed_mentions for a configured level', function () {
         return str_contains($request['content'] ?? '', '@here')
             && ($request['allowed_mentions']['parse'] ?? []) === ['everyone'];
     });
+});
+
+it('adds allowed_mentions parse=roles for a role mention', function () {
+    config()->set('discord-logger.mentions.ERROR', '<@&123456789012345678>');
+
+    Log::channel('discord')->error('ping the role');
+
+    Http::assertSent(function ($request) {
+        return str_contains($request['content'] ?? '', '<@&123456789012345678>')
+            && ($request['allowed_mentions']['parse'] ?? []) === ['roles'];
+    });
+});
+
+it('adds allowed_mentions parse=users for a user mention', function () {
+    config()->set('discord-logger.mentions.ERROR', '<@123456789012345678>');
+
+    Log::channel('discord')->error('ping the user');
+
+    Http::assertSent(function ($request) {
+        return str_contains($request['content'] ?? '', '<@123456789012345678>')
+            && ($request['allowed_mentions']['parse'] ?? []) === ['users'];
+    });
+});
+
+it('falls back to the rich converter when the configured converter is invalid', function () {
+    config()->set('discord-logger.converter', 'This\\Class\\Does\\Not\\Exist');
+
+    Log::channel('discord')->error('invalid converter');
+
+    Http::assertSent(fn ($request) => isset($request['embeds']) && $request['embeds'] !== []);
+});
+
+it('records the failure to the fallback channel when delivery throws', function () {
+    $path = tempnam(sys_get_temp_dir(), 'discord-fallback-').'.log';
+
+    config()->set('logging.channels.fallbacktest', [
+        'driver' => 'single',
+        'path' => $path,
+        'level' => 'debug',
+    ]);
+    config()->set('discord-logger.fallback_channel', 'fallbacktest');
+
+    Http::fake(function () {
+        throw new RuntimeException('network down');
+    });
+
+    Log::channel('discord')->error('boom');
+
+    expect(file_get_contents($path))->toContain('Discord logger delivery failed');
+
+    @unlink($path);
+});
+
+it('does not recurse when the fallback channel is the discord channel itself', function () {
+    // A failed send routed back into the same channel must hit the recursion
+    // guard (self::$handling) and return, not loop forever.
+    config()->set('discord-logger.fallback_channel', 'discord');
+
+    Http::fake(function () {
+        throw new RuntimeException('network down');
+    });
+
+    Log::channel('discord')->error('boom');
+})->throwsNoExceptions();
+
+it('schedules the dedup summary with a delay equal to the window', function () {
+    config()->set('discord-logger.queue.enabled', true);
+    config()->set('discord-logger.deduplication.enabled', true);
+    config()->set('discord-logger.deduplication.summary', true);
+    config()->set('discord-logger.deduplication.window', 123);
+    Bus::fake();
+
+    Log::channel('discord')->error('delayed summary');
+
+    Bus::assertDispatched(
+        SendDeduplicationSummary::class,
+        fn (SendDeduplicationSummary $job) => $job->delay === 123,
+    );
 });
 
 it('redacts sensitive context keys before sending', function () {

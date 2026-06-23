@@ -64,6 +64,11 @@ return [
     | Case-insensitive key fragments whose values are masked before sending, so
     | secrets in the log context never leak into Discord.
     |
+    | `redact_value_patterns` additionally matches against scalar *values* (in
+    | context, the message text and the stacktrace), catching secrets that leak
+    | under an innocuous key such as `url` or `auth`. They are full PCRE regexes.
+    | Leave the array empty to disable value-based redaction entirely.
+    |
     */
     'redact' => [
         'password',
@@ -74,6 +79,10 @@ return [
         'apikey',
     ],
     'redact_placeholder' => '[REDACTED]',
+    'redact_value_patterns' => [
+        '/Bearer\s+[A-Za-z0-9\-._~+\/]+=*/i',          // Authorization: Bearer <token>
+        '/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/', // JWT (header.payload.signature)
+    ],
 
     /*
     |--------------------------------------------------------------------------

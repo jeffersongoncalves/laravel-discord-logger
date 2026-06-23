@@ -14,6 +14,12 @@ class RichRecordConverter implements Converter
     /** Discord hard limit for the combined character count of a single embed. */
     private const EMBED_MAX = 6000;
 
+    /** Discord hard limit for a single embed field name. */
+    private const FIELD_NAME_MAX = 256;
+
+    /** Discord hard limit for a single embed field value. */
+    private const FIELD_VALUE_MAX = 1024;
+
     private Redactor $redactor;
 
     /**
@@ -30,7 +36,8 @@ class RichRecordConverter implements Converter
 
         $embed = [
             'title' => $this->title($record),
-            'description' => $this->truncate($record->message, 4000),
+            // The message is raw user/exception text — redact before it ships.
+            'description' => $this->truncate($this->redactor->scrubString($record->message), 4000),
             'color' => (int) ($this->config['colors'][$level] ?? 0x607D8B),
             'timestamp' => $record->datetime->format('c'),
             'fields' => $this->fields($record),
@@ -92,17 +99,14 @@ class RichRecordConverter implements Converter
 
         $exception = $record->context['exception'] ?? null;
         if ($exception instanceof Throwable) {
-            $fields[] = [
-                'name' => 'Exception',
-                'value' => $this->truncate($exception::class.' @ '.$exception->getFile().':'.$exception->getLine(), 1024),
-            ];
+            $fields[] = $this->field(
+                'Exception',
+                $exception::class.' @ '.$exception->getFile().':'.$exception->getLine(),
+            );
 
             $trace = $this->stacktrace($exception);
             if ($trace !== null) {
-                $fields[] = [
-                    'name' => 'Stacktrace',
-                    'value' => $trace,
-                ];
+                $fields[] = $this->field('Stacktrace', $trace);
             }
         }
 
@@ -113,13 +117,37 @@ class RichRecordConverter implements Converter
         );
 
         if ($context !== []) {
-            $fields[] = [
-                'name' => 'Context',
-                'value' => $this->code($this->json($this->redactor->scrub($context))),
-            ];
+            // Wrap the JSON in a code block, but keep the whole field value within
+            // Discord's 1024-char-per-field limit (an oversized context = HTTP 400).
+            $json = $this->truncate(
+                $this->json($this->redactor->scrub($context)),
+                self::FIELD_VALUE_MAX - $this->codeOverhead(),
+            );
+
+            $fields[] = $this->field('Context', $this->code($json));
         }
 
         return $fields;
+    }
+
+    /**
+     * Build a field with both name and value clamped to Discord's per-field
+     * limits so a single overgrown field never produces a 400.
+     *
+     * @return array{name: string, value: string}
+     */
+    private function field(string $name, string $value): array
+    {
+        return [
+            'name' => $this->truncate($name, self::FIELD_NAME_MAX),
+            'value' => $this->truncate($value, self::FIELD_VALUE_MAX),
+        ];
+    }
+
+    /** Characters added by wrapping a value in a fenced code block. */
+    private function codeOverhead(): int
+    {
+        return mb_strlen($this->code(''));
     }
 
     private function stacktrace(Throwable $exception): ?string
@@ -130,7 +158,8 @@ class RichRecordConverter implements Converter
             return null;
         }
 
-        $trace = $exception->getTraceAsString();
+        // The trace can embed argument values / paths with secrets — redact it.
+        $trace = $this->redactor->scrubString($exception->getTraceAsString());
 
         if ($mode === 'smart') {
             // Drop vendor frames to keep the embed focused and small.
