@@ -82,6 +82,8 @@ Within `deduplication.window` seconds, only the **first** occurrence of a finger
 
 Delivery runs through a queued job by default (`queue.enabled`). Discord 429s are retried respecting `Retry-After`; bad webhooks (4xx) fail fast instead of looping. Set `queue.enabled => false` to send inline (best-effort, errors swallowed).
 
+> **This means a queue worker must be running** (`php artisan queue:work`, Horizon, or supervisor) for `Log::debug/info/error(...)` calls to actually reach Discord. `discord-logger:test` sends inline and bypasses the queue entirely, so it will succeed even with no worker running — don't use it alone to confirm real logging works. If you don't run a worker (or don't want to), set `DISCORD_LOGGER_QUEUE=false`.
+
 ### State store
 
 Dedup + rate-limit counters live in the cache store named by `store` (null = default). **Use Redis in production** for atomic counters.
@@ -114,6 +116,19 @@ Sensitive data is masked before it ever reaches Discord, via two complementary s
 ### Fallback channel & safety
 
 The handler **never throws** and is guarded against logging-while-logging recursion. If delivery throws, the error is swallowed; set `fallback_channel` (e.g. `'single'`) to record those failures instead of losing them.
+
+## Troubleshooting
+
+**`discord-logger:test` works, but `Log::debug/info/error(...)` never shows up in Discord.**
+
+The test command sends inline, straight to the webhook. Real log calls go through a queued job by default (see [Async delivery](#async-delivery)), so nothing is delivered until a queue worker processes it. Fixes:
+
+- Run a worker: `php artisan queue:work` (or Horizon/supervisor in production), **or**
+- Set `DISCORD_LOGGER_QUEUE=false` to send inline instead (no worker needed).
+
+This is especially easy to hit on a fresh Laravel install (Laravel 11+, including 13): `QUEUE_CONNECTION` defaults to `database`, but no worker runs automatically — jobs just sit pending in the `jobs` table.
+
+Also check the channel's `level` in `config/logging.php` — if it's set above the level you're logging at (e.g. `level => 'error'` while calling `Log::debug(...)`), Monolog filters the record before it ever reaches the handler.
 
 ## Commands
 
