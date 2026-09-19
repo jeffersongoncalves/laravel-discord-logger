@@ -28,11 +28,13 @@ class DiscordRateLimiter
         $global = (array) ($this->config['rate_limit']['global'] ?? []);
         $perFp = (array) ($this->config['rate_limit']['per_fingerprint'] ?? []);
 
-        if (! $this->within('global', (int) ($global['max'] ?? 30), (int) ($global['per_seconds'] ?? 60))) {
+        // Check per-fingerprint first: a looping error blocked here must not
+        // also burn through the global budget meant for other errors.
+        if (! $this->within('fp:'.$fingerprint, (int) ($perFp['max'] ?? 1), (int) ($perFp['per_seconds'] ?? 300))) {
             return false;
         }
 
-        return $this->within('fp:'.$fingerprint, (int) ($perFp['max'] ?? 1), (int) ($perFp['per_seconds'] ?? 300));
+        return $this->within('global', (int) ($global['max'] ?? 30), (int) ($global['per_seconds'] ?? 60));
     }
 
     private function within(string $bucket, int $max, int $perSeconds): bool
