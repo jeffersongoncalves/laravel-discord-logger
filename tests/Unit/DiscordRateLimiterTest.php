@@ -68,6 +68,26 @@ it('does not consume the global budget when blocked by the per-fingerprint cap',
     expect($allowed)->toBe(9);
 });
 
+it('releases the per-fingerprint reservation when the global cap rejects the attempt', function () {
+    $limiter = new DiscordRateLimiter(['rate_limit' => [
+        'global' => ['max' => 1, 'per_seconds' => 60],
+        'per_fingerprint' => ['max' => 1, 'per_seconds' => 300],
+    ]]);
+
+    // Saturate the global bucket with a different fingerprint.
+    expect($limiter->allow('fp-other'))->toBeTrue();
+
+    // fp-1 clears its own per-fingerprint check but the global cap rejects
+    // it — nothing was sent, so this must not spend fp-1's own slot.
+    expect($limiter->allow('fp-1'))->toBeFalse();
+
+    // Once the global bucket frees up (window expiry, simulated here),
+    // fp-1 must still be able to send — it never actually delivered.
+    Cache::forget('discord-logger:rl:global');
+
+    expect($limiter->allow('fp-1'))->toBeTrue();
+});
+
 it('keeps independent counters per fingerprint bucket', function () {
     $limiter = new DiscordRateLimiter(['rate_limit' => [
         'global' => ['max' => 100, 'per_seconds' => 60],
