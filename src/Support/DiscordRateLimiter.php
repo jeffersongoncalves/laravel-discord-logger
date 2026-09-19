@@ -28,11 +28,26 @@ class DiscordRateLimiter
         $global = (array) ($this->config['rate_limit']['global'] ?? []);
         $perFp = (array) ($this->config['rate_limit']['per_fingerprint'] ?? []);
 
-        if (! $this->within('global', (int) ($global['max'] ?? 30), (int) ($global['per_seconds'] ?? 60))) {
+        $fpBucket = 'fp:'.$fingerprint;
+        $fpMax = (int) ($perFp['max'] ?? 1);
+
+        // Check per-fingerprint first: a looping error blocked here must not
+        // also burn through the global budget meant for other errors.
+        if (! $this->within($fpBucket, $fpMax, (int) ($perFp['per_seconds'] ?? 300))) {
             return false;
         }
 
-        return $this->within('fp:'.$fingerprint, (int) ($perFp['max'] ?? 1), (int) ($perFp['per_seconds'] ?? 300));
+        if ($this->within('global', (int) ($global['max'] ?? 30), (int) ($global['per_seconds'] ?? 60))) {
+            return true;
+        }
+
+        // The global cap rejected this attempt after the fingerprint slot was
+        // reserved — nothing was actually sent, so release the reservation.
+        // Otherwise a fingerprint that merely got unlucky on global timing
+        // stays blocked for its whole window despite never having delivered.
+        $this->release($fpBucket, $fpMax);
+
+        return false;
     }
 
     private function within(string $bucket, int $max, int $perSeconds): bool
@@ -42,7 +57,7 @@ class DiscordRateLimiter
         }
 
         $store = $this->store();
-        $key = 'discord-logger:rl:'.$bucket;
+        $key = $this->key($bucket);
 
         // First hit in the window starts the counter with a fixed TTL.
         if ($store->add($key, 1, $perSeconds)) {
@@ -50,6 +65,25 @@ class DiscordRateLimiter
         }
 
         return (int) $store->increment($key) <= $max;
+    }
+
+    private function release(string $bucket, int $max): void
+    {
+        if ($max <= 0) {
+            return;
+        }
+
+        $store = $this->store();
+        $key = $this->key($bucket);
+
+        if ((int) $store->decrement($key) < 1) {
+            $store->forget($key);
+        }
+    }
+
+    private function key(string $bucket): string
+    {
+        return 'discord-logger:rl:'.$bucket;
     }
 
     private function store(): Repository
