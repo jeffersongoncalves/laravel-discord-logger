@@ -117,7 +117,7 @@ class DiscordHandler extends AbstractProcessingHandler
         if (str_contains($mention, '<@&')) {
             $parse[] = 'roles';
         }
-        if (preg_match('/<@\d+>/', $mention)) {
+        if (preg_match('/<@!?\d+>/', $mention)) {
             $parse[] = 'users';
         }
 

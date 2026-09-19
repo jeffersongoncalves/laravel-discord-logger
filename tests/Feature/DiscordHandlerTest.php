@@ -150,6 +150,17 @@ it('adds allowed_mentions parse=users for a user mention', function () {
     });
 });
 
+it('adds allowed_mentions parse=users for a nickname-style user mention', function () {
+    config()->set('discord-logger.mentions.ERROR', '<@!123456789012345678>');
+
+    Log::channel('discord')->error('ping the user');
+
+    Http::assertSent(function ($request) {
+        return str_contains($request['content'] ?? '', '<@!123456789012345678>')
+            && ($request['allowed_mentions']['parse'] ?? []) === ['users'];
+    });
+});
+
 it('falls back to the rich converter when the configured converter is invalid', function () {
     config()->set('discord-logger.converter', 'This\\Class\\Does\\Not\\Exist');
 
