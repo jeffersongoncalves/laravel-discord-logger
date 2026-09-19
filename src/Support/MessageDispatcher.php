@@ -27,8 +27,9 @@ class MessageDispatcher
             return;
         }
 
-        // Inline, best-effort. Logging must never break the request.
-        app(DiscordWebhook::class)->send($webhook, $payload);
+        // Inline: surface a failed response as an exception so it reaches the
+        // fallback channel — no queue/retry here to report it any other way.
+        app(DiscordWebhook::class)->send($webhook, $payload)->throw();
     }
 
     public function queue(DiscordJob $job): void
