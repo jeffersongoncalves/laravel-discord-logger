@@ -2,6 +2,23 @@
 
 All notable changes to `laravel-discord-logger` will be documented in this file.
 
+## v2.0.1 - 2026-09-19
+
+### What's Changed
+
+* fix: pin GitHub Actions to commit SHA by @jeffersongoncalves in https://github.com/jeffersongoncalves/laravel-discord-logger/pull/2
+* docs: add Buy Me a Coffee sponsor link by @jeffersongoncalves in https://github.com/jeffersongoncalves/laravel-discord-logger/pull/3
+* docs: standardize README section structure by @jeffersongoncalves in https://github.com/jeffersongoncalves/laravel-discord-logger/pull/4
+* chore: add GitHub Sponsors to FUNDING.yml by @jeffersongoncalves in https://github.com/jeffersongoncalves/laravel-discord-logger/pull/5
+* fix: rate-limit ordering, inline delivery failures, nickname mentions + test coverage by @jeffersongoncalves in https://github.com/jeffersongoncalves/laravel-discord-logger/pull/6
+* ci: run tests only against PHP 8.4 / Laravel 13.x by @jeffersongoncalves in https://github.com/jeffersongoncalves/laravel-discord-logger/pull/7
+
+### New Contributors
+
+* @jeffersongoncalves made their first contribution in https://github.com/jeffersongoncalves/laravel-discord-logger/pull/2
+
+**Full Changelog**: https://github.com/jeffersongoncalves/laravel-discord-logger/compare/v2.0.0...v2.0.1
+
 ## v2.0.0 - 2026-08-01
 
 ### Security
