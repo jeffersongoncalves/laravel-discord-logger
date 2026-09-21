@@ -49,8 +49,11 @@ class Redactor
      * the configured value patterns. Returns it unchanged when no pattern matches
      * or none are configured.
      *
-     * A pattern with a capture group keeps that group in the output (e.g. the
-     * key name in `"api_token":"secret"`) so the masked text stays readable.
+     * A pattern may declare a named `(?<safe>...)` group to keep that part of the
+     * match in the output (e.g. the key name in `"api_token":"secret"`), so the
+     * masked text stays readable. Any other (numbered) capture group is ignored,
+     * so a custom pattern that happens to group part of the secret itself can't
+     * leak it back out — only the explicit `safe` name is trusted.
      */
     public function scrubString(string $value): string
     {
@@ -65,7 +68,7 @@ class Redactor
 
             $replaced = @preg_replace_callback(
                 $pattern,
-                fn (array $matches): string => ($matches[1] ?? '').$this->placeholder,
+                fn (array $matches): string => ($matches['safe'] ?? '').$this->placeholder,
                 $value,
             );
 

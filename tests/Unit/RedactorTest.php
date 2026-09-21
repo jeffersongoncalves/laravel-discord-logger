@@ -96,3 +96,34 @@ it('redacts a sensitive query string parameter and keeps the key', function () {
     expect($redactor->scrubString('GET https://example.com?token=abc123&id=1'))
         ->toBe('GET https://example.com?token=[REDACTED]&id=1');
 });
+
+it('redacts a short Basic credential via the default pattern', function () {
+    $redactor = Redactor::fromConfig(config('discord-logger'));
+
+    expect($redactor->scrubString('Authorization: Basic YTpi'))
+        ->toBe('Authorization: [REDACTED]')
+        ->not->toContain('YTpi');
+});
+
+it('redacts a serialized JSON value containing an escaped quote without leaving a remainder', function () {
+    $redactor = Redactor::fromConfig(config('discord-logger'));
+
+    $out = $redactor->scrubString('request failed {"api_token":"abc\"def"}');
+
+    expect($out)->toBe('request failed {"api_token":"[REDACTED]"}')
+        ->not->toContain('abc')
+        ->not->toContain('def');
+});
+
+it('ignores a numbered capture group that is not the named safe group', function () {
+    $redactor = new Redactor(
+        keys: [],
+        valuePatterns: ['/(secret_\d+)=\w+/i'],
+    );
+
+    $out = $redactor->scrubString('leaked secret_1=hunter2');
+
+    expect($out)->toBe('leaked [REDACTED]')
+        ->not->toContain('secret_1')
+        ->not->toContain('hunter2');
+});

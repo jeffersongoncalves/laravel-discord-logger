@@ -82,9 +82,9 @@ return [
     'redact_value_patterns' => [
         '/Bearer\s+[A-Za-z0-9\-._~+\/]+=*/i',          // Authorization: Bearer <token>
         '/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/', // JWT (header.payload.signature)
-        '/Basic\s+[A-Za-z0-9+\/]{8,}={0,2}/i',         // Authorization: Basic <base64 user:pass>
-        '/("(?:[^"]*)(?:authorization|token|password|secret|api_?key)(?:[^"]*)"\s*:\s*")[^"]*(?=")/i', // "api_token":"..." inside serialized JSON text
-        '/((?:authorization|token|password|secret|api_?key)=)[^&\s"\']+/i', // ?token=... in a logged URL
+        '/Basic\s+[A-Za-z0-9+\/]{4,}={0,2}/i',         // Authorization: Basic <base64 user:pass>
+        '/(?<safe>"(?:[^"]*)(?:authorization|token|password|secret|api_?key)(?:[^"]*)"\s*:\s*")(?:\\\\.|[^"\\\\])*(?=")/i', // "api_token":"..." inside serialized JSON text
+        '/(?<safe>(?:authorization|token|password|secret|api_?key)=)[^&\s"\']+/i', // ?token=... in a logged URL
     ],
 
     /*
