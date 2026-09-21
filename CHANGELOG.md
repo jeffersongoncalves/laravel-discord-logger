@@ -2,6 +2,17 @@
 
 All notable changes to `laravel-discord-logger` will be documented in this file.
 
+## v2.0.2 - 2026-09-21
+
+### Fixed
+
+- Default redact_value_patterns now cover Authorization: Basic credentials and sensitive key/value pairs embedded in serialized message text (JSON payloads, query strings), closing gaps where a caller-built log message bypassed key-based redaction entirely.
+- Redactor::scrubString() now supports a named (?<safe>...) capture group so a pattern can keep a key name in the masked output without risking a numbered group leaking part of the secret.
+
+Closes #8
+
+**Full Changelog**: https://github.com/jeffersongoncalves/laravel-discord-logger/compare/v2.0.1...v2.0.2
+
 ## v2.0.1 - 2026-09-19
 
 ### What's Changed
