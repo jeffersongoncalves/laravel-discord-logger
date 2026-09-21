@@ -74,3 +74,25 @@ it('leaves strings untouched when no value patterns are configured', function ()
 
     expect($redactor->scrubString('Bearer abc.def.ghi'))->toBe('Bearer abc.def.ghi');
 });
+
+it('redacts Authorization: Basic credentials via the default pattern', function () {
+    $redactor = Redactor::fromConfig(config('discord-logger'));
+
+    expect($redactor->scrubString('Authorization: Basic dXNlcjpodW50ZXIy'))
+        ->toBe('Authorization: [REDACTED]')
+        ->not->toContain('dXNlcjpodW50ZXIy');
+});
+
+it('redacts a sensitive key/value pair inside serialized JSON text and keeps the key', function () {
+    $redactor = Redactor::fromConfig(config('discord-logger'));
+
+    expect($redactor->scrubString('request failed {"api_token":"abc123"}'))
+        ->toBe('request failed {"api_token":"[REDACTED]"}');
+});
+
+it('redacts a sensitive query string parameter and keeps the key', function () {
+    $redactor = Redactor::fromConfig(config('discord-logger'));
+
+    expect($redactor->scrubString('GET https://example.com?token=abc123&id=1'))
+        ->toBe('GET https://example.com?token=[REDACTED]&id=1');
+});

@@ -48,6 +48,9 @@ class Redactor
      * Mask a single string value (e.g. an exception message or stacktrace) using
      * the configured value patterns. Returns it unchanged when no pattern matches
      * or none are configured.
+     *
+     * A pattern with a capture group keeps that group in the output (e.g. the
+     * key name in `"api_token":"secret"`) so the masked text stays readable.
      */
     public function scrubString(string $value): string
     {
@@ -60,7 +63,12 @@ class Redactor
                 continue;
             }
 
-            $replaced = @preg_replace($pattern, $this->placeholder, $value);
+            $replaced = @preg_replace_callback(
+                $pattern,
+                fn (array $matches): string => ($matches[1] ?? '').$this->placeholder,
+                $value,
+            );
+
             if (is_string($replaced)) {
                 $value = $replaced;
             }
