@@ -20,6 +20,15 @@ class RichRecordConverter implements Converter
     /** Discord hard limit for a single embed field value. */
     private const FIELD_VALUE_MAX = 1024;
 
+    /** Stacktrace characters shown inline in the embed. */
+    private const TRACE_MAX = 1000;
+
+    /**
+     * ponytail: fixed cap keeps the queued job under SQS's 256 KB payload limit
+     * (Vapor); make it configurable if a real trace ever needs more.
+     */
+    private const ATTACHMENT_MAX = 100_000;
+
     private Redactor $redactor;
 
     /**
@@ -49,7 +58,34 @@ class RichRecordConverter implements Converter
             'username' => $this->config['from']['name'] ?? null,
             'avatar_url' => $this->config['from']['avatar_url'] ?? null,
             'embeds' => [array_filter($embed, fn ($v) => $v !== [])],
+            'files' => $this->attachments($record),
         ], fn ($v) => $v !== null);
+    }
+
+    /**
+     * The full exception as a .txt attachment when it can't fit in the embed,
+     * so nothing is lost to truncation. The transport sends it as multipart.
+     *
+     * @return array<string, string>|null filename => contents
+     */
+    private function attachments(LogRecord $record): ?array
+    {
+        $exception = $record->context['exception'] ?? null;
+
+        if (! $exception instanceof Throwable
+            || ($this->config['stacktrace'] ?? 'smart') === 'none'
+            || ($this->config['attach_stacktrace'] ?? true) !== true) {
+            return null;
+        }
+
+        // Message, every frame (vendor included) and each chained previous exception.
+        $full = $this->redactor->scrubString((string) $exception);
+
+        if (mb_strlen($full) <= self::TRACE_MAX) {
+            return null;
+        }
+
+        return ['stacktrace.txt' => $this->truncate($full, self::ATTACHMENT_MAX)];
     }
 
     /**
@@ -210,7 +246,7 @@ class RichRecordConverter implements Converter
             $trace = implode("\n", $lines);
         }
 
-        return $this->code($this->truncate($trace, 1000));
+        return $this->code($this->truncate($trace, self::TRACE_MAX));
     }
 
     private function code(string $value): string

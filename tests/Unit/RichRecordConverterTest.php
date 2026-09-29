@@ -99,6 +99,44 @@ it('omits the stacktrace when the mode is none', function () {
         ->and($names)->toContain('Exception');
 });
 
+it('attaches the full redacted exception when it does not fit in the embed', function () {
+    $config = config('discord-logger');
+    $config['redact_value_patterns'] = ['/SHHSECRET/'];
+
+    $converter = new RichRecordConverter($config);
+
+    $throw = function (string $token) {
+        throw new RuntimeException('boom', previous: new LogicException('root cause'));
+    };
+
+    try {
+        $throw('SHHSECRET');
+    } catch (RuntimeException $e) {
+        $payload = $converter->convert(record('boom', ['exception' => $e]));
+    }
+
+    $file = $payload['files']['stacktrace.txt'] ?? '';
+
+    expect(mb_strlen($file))->toBeGreaterThan(1000)
+        ->and($file)
+        ->toContain('RuntimeException: boom')
+        ->toContain('LogicException: root cause')
+        ->toContain('phpunit') // vendor frame: smart mode trims the embed, never the file
+        ->not->toContain('SHHSECRET');
+});
+
+it('attaches nothing when disabled, in none mode or without an exception', function (array $overrides, array $context) {
+    $converter = new RichRecordConverter(array_replace(config('discord-logger'), $overrides));
+
+    $payload = $converter->convert(record('boom', $context));
+
+    expect($payload)->not->toHaveKey('files');
+})->with([
+    'attach disabled' => [['attach_stacktrace' => false], ['exception' => new RuntimeException('x')]],
+    'stacktrace none' => [['stacktrace' => 'none'], ['exception' => new RuntimeException('x')]],
+    'no exception' => [[], ['order' => 7]],
+]);
+
 it('drops vendor frames from the stacktrace in smart mode', function () {
     $config = config('discord-logger');
     $config['stacktrace'] = 'smart';

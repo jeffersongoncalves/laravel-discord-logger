@@ -7,7 +7,8 @@ use Monolog\LogRecord;
 interface Converter
 {
     /**
-     * Build a Discord webhook payload from a log record.
+     * Build a Discord webhook payload from a log record. An optional `files`
+     * key (filename => contents) is sent as attachments.
      *
      * @return array<string, mixed>
      */

@@ -128,8 +128,13 @@ return [
     | Stacktrace rendering
     |--------------------------------------------------------------------------
     | smart | full | none
+    |
+    | attach_stacktrace: when the exception doesn't fit in the embed, also send
+    | it in full (message, every frame, chained exceptions — redacted) as a
+    | stacktrace.txt attachment. Ignored when `stacktrace` is 'none'.
     */
     'stacktrace' => env('DISCORD_LOGGER_STACKTRACE', 'smart'),
+    'attach_stacktrace' => env('DISCORD_LOGGER_ATTACH_STACKTRACE', true),
 
     /*
     |--------------------------------------------------------------------------
