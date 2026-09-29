@@ -251,12 +251,18 @@ class RichRecordConverter implements Converter
             // Drop vendor frames to keep the embed focused and small.
             $lines = array_filter(
                 explode("\n", $trace),
-                fn ($line) => ! str_contains($line, '/vendor/'),
+                fn ($line) => ! self::isVendorFrame($line),
             );
             $trace = implode("\n", $lines);
         }
 
         return $this->code($this->truncate($trace, self::TRACE_MAX));
+    }
+
+    /** Either separator: frame paths are `\vendor\` on Windows, `/vendor/` elsewhere. */
+    private static function isVendorFrame(string $line): bool
+    {
+        return preg_match('#[\\\\/]vendor[\\\\/]#', $line) === 1;
     }
 
     private function code(string $value): string

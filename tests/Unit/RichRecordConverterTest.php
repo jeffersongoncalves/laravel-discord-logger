@@ -178,9 +178,24 @@ it('drops vendor frames from the stacktrace in smart mode', function () {
 
     $trace = collect($payload['embeds'][0]['fields'])->firstWhere('name', 'Stacktrace')['value'] ?? '';
 
-    expect($trace)->not->toContain('/vendor/');
+    // The real trace comes from Pest itself, so it's full of vendor frames in
+    // whatever separator this OS uses — both must be filtered.
+    expect($trace)->not->toBe('')
+        ->not->toContain('/vendor/')
+        ->not->toContain('\\vendor\\');
 });
 
+it('recognises vendor frames on Linux and Windows paths', function (string $line, bool $vendor) {
+    $isVendorFrame = new ReflectionMethod(RichRecordConverter::class, 'isVendorFrame');
+
+    expect($isVendorFrame->invoke(null, $line))->toBe($vendor);
+})->with([
+    'linux vendor' => ['#3 /var/www/app/vendor/laravel/framework/src/Foo.php(12): bar()', true],
+    'windows vendor' => ['#3 C:\\www\\app\\vendor\\laravel\\framework\\src\\Foo.php(12): bar()', true],
+    'linux app' => ['#1 /var/www/app/app/Http/Controllers/OrderController.php(40): charge()', false],
+    'windows app' => ['#1 C:\\www\\app\\app\\Http\\Controllers\\OrderController.php(40): charge()', false],
+    'vendor as a name, not a directory' => ['#2 /var/www/app/app/Models/Vendor.php(9): save()', false],
+]);
 it('redacts secret value patterns in the stacktrace', function () {
     $config = config('discord-logger');
     $config['stacktrace'] = 'full';
