@@ -154,6 +154,9 @@ php artisan discord-logger:install
 
 # Send a test message to verify the webhook
 php artisan discord-logger:test --channel=discord
+
+# Send a sample exception through the real converter (embed + stacktrace.txt attachment)
+php artisan discord-logger:test --exception
 ```
 
 ## Testing
