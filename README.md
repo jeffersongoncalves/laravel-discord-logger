@@ -112,7 +112,7 @@ Each message says where it came from, as extra embed fields (turn off with `DISC
 
 - **Request** — method, URL, route name, user id (only if already resolved — logging never triggers a user lookup) and IP
 - **Job** — class, queue, connection, attempt and id of the queued job being processed, including when the log is the job's own failure
-- **Command** — the artisan command line, for console logs outside a job
+- **Command** — the artisan command name (never its arguments, which may carry secrets), for console logs outside a job
 
 Anything in the record's `extra` — e.g. data added with Laravel's `Context::add()`, or Monolog processors — is shown in an **Extra** field. All of it goes through redaction, so `?token=...` in a URL is masked.
 

@@ -22,7 +22,10 @@ beforeEach(function () {
     event(new Looping('sync', 'default')); // reset any job context left behind
 });
 
-afterEach(fn () => event(new Looping('sync', 'default')));
+afterEach(function () {
+    event(new Looping('sync', 'default'));
+    event('Laravel\Octane\Events\RequestTerminated');
+});
 
 /** @return array<string, string> field name => value of the single sent embed */
 function sentFields(): array
@@ -90,12 +93,58 @@ it('adds the queued job the log came from and keeps it through a failure', funct
 });
 
 it('forgets the job once it was processed', function () {
-    event(new JobProcessing('redis', fakeJob()));
-    event(new JobProcessed('redis', fakeJob()));
+    $job = fakeJob();
+
+    event(new JobProcessing('redis', $job));
+    event(new JobProcessed('redis', $job));
 
     Log::channel('discord')->error('after the job');
 
     expect(sentFields())->not->toHaveKey('Job')->toHaveKey('Command');
+});
+
+it('restores the outer job after a nested sync job finishes', function () {
+    $outer = fakeJob();
+    $inner = Mockery::mock(Job::class);
+    $inner->allows([
+        'resolveName' => 'App\\Jobs\\SendReceipt',
+        'getQueue' => 'default',
+        'attempts' => 1,
+        'getJobId' => '',
+        'payload' => [],
+    ]);
+
+    event(new JobProcessing('redis', $outer));
+    event(new JobProcessing('sync', $inner));
+    event(new JobProcessed('sync', $inner));
+
+    Log::channel('discord')->error('back in the outer job');
+
+    expect(sentFields()['Job'])
+        ->toContain('App\\Jobs\\ChargeOrder')
+        ->not->toContain('SendReceipt');
+});
+
+it('treats an Octane request as HTTP even under the CLI SAPI, before routing', function () {
+    event('Laravel\Octane\Events\RequestReceived');
+
+    Log::channel('discord')->error('from a middleware');
+
+    expect(sentFields())->toHaveKey('Request')->not->toHaveKey('Command');
+});
+
+it('reports only the command name, never its arguments', function () {
+    $argv = $_SERVER['argv'];
+    $_SERVER['argv'] = ['artisan', '--no-interaction', 'user:create', '--password', 'hunter2', 'positional-secret'];
+
+    try {
+        Log::channel('discord')->error('from a command');
+    } finally {
+        $_SERVER['argv'] = $argv;
+    }
+
+    expect(sentFields()['Command'])
+        ->toBe('**command:** `artisan user:create`');
 });
 
 it('omits runtime context when disabled', function () {
