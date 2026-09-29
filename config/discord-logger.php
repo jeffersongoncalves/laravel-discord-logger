@@ -89,6 +89,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Runtime context
+    |--------------------------------------------------------------------------
+    |
+    | Adds where the log came from as embed fields: the HTTP request (method,
+    | URL, route, already-resolved user id, IP), the queued job (name, queue,
+    | attempts) or the artisan command. Values go through redaction too.
+    |
+    */
+    'runtime_context' => env('DISCORD_LOGGER_RUNTIME_CONTEXT', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Fallback channel
     |--------------------------------------------------------------------------
     |

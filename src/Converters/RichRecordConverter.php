@@ -103,7 +103,18 @@ class RichRecordConverter implements Converter
                 'Exception',
                 $exception::class.' @ '.$exception->getFile().':'.$exception->getLine(),
             );
+        }
 
+        // Small and high-signal, so it sits before the bulky fields that the
+        // embed clamp drops first.
+        $runtime = $record->extra['runtime'] ?? [];
+        foreach (is_array($runtime) ? $runtime : [] as $name => $data) {
+            if (is_array($data) && $data !== []) {
+                $fields[] = $this->field(ucfirst((string) $name), $this->lines($this->redactor->scrub($data)));
+            }
+        }
+
+        if ($exception instanceof Throwable) {
             $trace = $this->stacktrace($exception);
             if ($trace !== null) {
                 $fields[] = $this->field('Stacktrace', $trace);
@@ -117,17 +128,46 @@ class RichRecordConverter implements Converter
         );
 
         if ($context !== []) {
-            // Wrap the JSON in a code block, but keep the whole field value within
-            // Discord's 1024-char-per-field limit (an oversized context = HTTP 400).
-            $json = $this->truncate(
-                $this->json($this->redactor->scrub($context)),
-                self::FIELD_VALUE_MAX - $this->codeOverhead(),
-            );
+            $fields[] = $this->field('Context', $this->jsonBlock($context));
+        }
 
-            $fields[] = $this->field('Context', $this->code($json));
+        // Everything else in `extra`: Laravel's Context::add() data, Monolog processors.
+        $extra = array_filter($record->extra, fn ($key) => $key !== 'runtime', ARRAY_FILTER_USE_KEY);
+
+        if ($extra !== []) {
+            $fields[] = $this->field('Extra', $this->jsonBlock($extra));
         }
 
         return $fields;
+    }
+
+    /**
+     * Redacted JSON in a code block, kept within Discord's 1024-char-per-field
+     * limit (an oversized field = HTTP 400).
+     *
+     * @param  array<array-key, mixed>  $data
+     */
+    private function jsonBlock(array $data): string
+    {
+        return $this->code($this->truncate(
+            $this->json($this->redactor->scrub($data)),
+            self::FIELD_VALUE_MAX - $this->codeOverhead(),
+        ));
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $data
+     */
+    private function lines(array $data): string
+    {
+        $lines = [];
+
+        foreach ($data as $key => $value) {
+            $value = is_scalar($value) ? (string) $value : $this->json((array) $value);
+            $lines[] = "**{$key}:** `".str_replace('`', "'", $value).'`';
+        }
+
+        return implode("\n", $lines);
     }
 
     /**

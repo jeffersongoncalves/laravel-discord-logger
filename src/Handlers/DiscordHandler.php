@@ -10,6 +10,7 @@ use JeffersonGoncalves\DiscordLogger\Support\Deduplicator;
 use JeffersonGoncalves\DiscordLogger\Support\DiscordRateLimiter;
 use JeffersonGoncalves\DiscordLogger\Support\Fingerprinter;
 use JeffersonGoncalves\DiscordLogger\Support\MessageDispatcher;
+use JeffersonGoncalves\DiscordLogger\Support\RuntimeContext;
 use Monolog\Handler\AbstractProcessingHandler;
 use Monolog\Logger as Monolog;
 use Monolog\LogRecord;
@@ -28,6 +29,8 @@ class DiscordHandler extends AbstractProcessingHandler
 
     private MessageDispatcher $dispatcher;
 
+    private RuntimeContext $runtime;
+
     /**
      * @param  array<string, mixed>  $config
      */
@@ -42,6 +45,7 @@ class DiscordHandler extends AbstractProcessingHandler
         $this->deduplicator = new Deduplicator($config);
         $this->rateLimiter = new DiscordRateLimiter($config);
         $this->dispatcher = new MessageDispatcher($config);
+        $this->runtime = new RuntimeContext;
     }
 
     protected function write(LogRecord $record): void
@@ -82,6 +86,12 @@ class DiscordHandler extends AbstractProcessingHandler
 
         if (! $this->rateLimiter->allow($fingerprint)) {
             return; // Over the volume cap — drop.
+        }
+
+        // Captured here, synchronously, while the request/job is still live —
+        // and only for records that will actually be sent.
+        if (($this->config['runtime_context'] ?? true) === true && ($runtime = $this->runtime->capture()) !== []) {
+            $record = $record->with(extra: [...$record->extra, 'runtime' => $runtime]);
         }
 
         $converter = $this->converter();

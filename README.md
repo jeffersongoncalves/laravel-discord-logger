@@ -106,6 +106,16 @@ Route a level to its own channel and ping someone when it matters:
 
 `allowed_mentions` is set automatically, so `@here` / `@everyone` / role / user pings actually fire.
 
+### Runtime context
+
+Each message says where it came from, as extra embed fields (turn off with `DISCORD_LOGGER_RUNTIME_CONTEXT=false`):
+
+- **Request** — method, URL, route name, user id (only if already resolved — logging never triggers a user lookup) and IP
+- **Job** — class, queue, connection, attempt and id of the queued job being processed, including when the log is the job's own failure
+- **Command** — the artisan command name (never its arguments, which may carry secrets), for console logs outside a job
+
+Anything in the record's `extra` — e.g. data added with Laravel's `Context::add()`, or Monolog processors — is shown in an **Extra** field. All of it goes through redaction, so `?token=...` in a URL is masked.
+
 ### Context redaction
 
 Sensitive data is masked before it ever reaches Discord, via two complementary strategies:
