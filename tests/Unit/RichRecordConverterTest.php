@@ -46,6 +46,19 @@ it('truncates a context field to Discord 1024-char limit while keeping it', func
     }
 });
 
+it('keeps accented characters readable in the context field', function () {
+    $converter = new RichRecordConverter(config('discord-logger'));
+
+    $payload = $converter->convert(record('pedido', ['user' => 'Não logado', 'bad' => "a\xB1b"]));
+
+    $context = collect($payload['embeds'][0]['fields'])->firstWhere('name', 'Context')['value'];
+
+    expect($context)
+        ->toContain('Não logado')
+        ->not->toContain('\\u00')
+        ->toContain('"bad": "a�b"');
+});
+
 it('redacts secret value patterns in the message', function () {
     $config = config('discord-logger');
     $config['redact_value_patterns'] = ['/Bearer\s+[A-Za-z0-9._-]+/i'];
