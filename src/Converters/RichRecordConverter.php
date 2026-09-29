@@ -24,10 +24,12 @@ class RichRecordConverter implements Converter
     private const TRACE_MAX = 1000;
 
     /**
-     * ponytail: fixed cap keeps the queued job under SQS's 256 KB payload limit
-     * (Vapor); make it configurable if a real trace ever needs more.
+     * In BYTES: the queued job is serialized, then JSON-encoded, which can
+     * double escape-heavy text (`\` and newlines, everywhere in a trace). 64 KiB
+     * x2 plus the embed stays under SQS's 256 KiB message limit (Vapor).
+     * ponytail: fixed cap; make it configurable if a real trace ever needs more.
      */
-    private const ATTACHMENT_MAX = 100_000;
+    private const ATTACHMENT_MAX_BYTES = 64 * 1024;
 
     private Redactor $redactor;
 
@@ -85,7 +87,15 @@ class RichRecordConverter implements Converter
             return null;
         }
 
-        return ['stacktrace.txt' => $this->truncate($full, self::ATTACHMENT_MAX)];
+        // Valid UTF-8 (invalid bytes would make the queue's json_encode fail and
+        // lose the whole log), cut on a character boundary within the byte cap.
+        $full = mb_scrub($full, 'UTF-8');
+
+        if (strlen($full) > self::ATTACHMENT_MAX_BYTES) {
+            $full = mb_strcut($full, 0, self::ATTACHMENT_MAX_BYTES - strlen('…'), 'UTF-8').'…';
+        }
+
+        return ['stacktrace.txt' => $full];
     }
 
     /**

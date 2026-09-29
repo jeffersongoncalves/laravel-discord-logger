@@ -97,6 +97,19 @@ it('redacts a sensitive query string parameter and keeps the key', function () {
         ->toBe('GET https://example.com?token=[REDACTED]&id=1');
 });
 
+it('redacts colon-delimited sensitive values via the default pattern', function (string $in, string $out) {
+    $redactor = Redactor::fromConfig(config('discord-logger'));
+
+    expect($redactor->scrubString($in))->toBe($out);
+})->with([
+    'message' => ['login failed password: hunter2', 'login failed password: [REDACTED]'],
+    'env-style key, list' => ['DB_PASSWORD: s3cr3t, host: db', 'DB_PASSWORD: [REDACTED], host: db'],
+    'single-quoted value' => ["api_key : 'abc 123'", 'api_key : [REDACTED]'],
+    'already masked by Bearer' => ['Authorization: Bearer abc.def', 'Authorization: [REDACTED]'],
+    'JSON left to its own pattern' => ['{"api_token":"abc"}', '{"api_token":"[REDACTED]"}'],
+    'trace frame untouched' => ['#0 /app/TokenService.php(12): App\\TokenService->refresh()', '#0 /app/TokenService.php(12): App\\TokenService->refresh()'],
+]);
+
 it('redacts a short Basic credential via the default pattern', function () {
     $redactor = Redactor::fromConfig(config('discord-logger'));
 

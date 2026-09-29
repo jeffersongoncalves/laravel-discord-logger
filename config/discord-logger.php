@@ -85,6 +85,7 @@ return [
         '/Basic\s+[A-Za-z0-9+\/]{4,}={0,2}/i',         // Authorization: Basic <base64 user:pass>
         '/(?<safe>"(?:[^"]*)(?:authorization|token|password|secret|api_?key)(?:[^"]*)"\s*:\s*")(?:\\\\.|[^"\\\\])*(?=")/i', // "api_token":"..." inside serialized JSON text
         '/(?<safe>(?:authorization|token|password|secret|api_?key)=)[^&\s"\']+/i', // ?token=... in a logged URL
+        '/(?<safe>[\w.-]*(?:authorization|token|password|secret|api_?key)[\w.-]*\'?\s*:\s*)(?:\'[^\']*\'|[^\s,;"\'}\[\]][^\s,;"\'}\]]*)/i', // password: hunter2 (messages, YAML, headers)
     ],
 
     /*
