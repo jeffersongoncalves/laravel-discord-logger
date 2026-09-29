@@ -1,6 +1,7 @@
 <?php
 
 use JeffersonGoncalves\DiscordLogger\Converters\RichRecordConverter;
+use JeffersonGoncalves\DiscordLogger\Jobs\SendDiscordMessage;
 
 function embedSize(array $embed): int
 {
@@ -98,6 +99,74 @@ it('omits the stacktrace when the mode is none', function () {
     expect($names)->not->toContain('Stacktrace')
         ->and($names)->toContain('Exception');
 });
+
+it('attaches the full redacted exception when it does not fit in the embed', function () {
+    $config = config('discord-logger');
+    $config['redact_value_patterns'] = ['/SHHSECRET/'];
+
+    $converter = new RichRecordConverter($config);
+
+    $throw = function (string $token) {
+        throw new RuntimeException('boom', previous: new LogicException('root cause'));
+    };
+
+    try {
+        $throw('SHHSECRET');
+    } catch (RuntimeException $e) {
+        $payload = $converter->convert(record('boom', ['exception' => $e]));
+    }
+
+    $file = $payload['files']['stacktrace.txt'] ?? '';
+
+    expect(mb_strlen($file))->toBeGreaterThan(1000)
+        ->and($file)
+        ->toContain('RuntimeException: boom')
+        ->toContain('LogicException: root cause')
+        ->toContain('phpunit') // vendor frame: smart mode trims the embed, never the file
+        ->not->toContain('SHHSECRET');
+});
+
+it('redacts a colon-delimited secret in a chained exception before attaching it', function () {
+    $converter = new RichRecordConverter(config('discord-logger'));
+
+    $e = new RuntimeException('boom', previous: new LogicException('connect failed, password: hunter2'));
+
+    $file = $converter->convert(record('boom', ['exception' => $e]))['files']['stacktrace.txt'] ?? '';
+
+    expect($file)->toContain('password: [REDACTED]')->not->toContain('hunter2');
+});
+
+it('keeps the queued job under the 256 KiB SQS limit whatever the exception text', function (string $message) {
+    $converter = new RichRecordConverter(config('discord-logger'));
+
+    $payload = $converter->convert(record($message, ['exception' => new RuntimeException($message)]));
+
+    // Same envelope Laravel builds: serialized job inside a JSON payload.
+    $queued = json_encode(
+        ['data' => ['command' => serialize(new SendDiscordMessage('https://discord.test/hook', $payload))]],
+        JSON_UNESCAPED_UNICODE,
+    );
+
+    expect($queued)->not->toBeFalse()
+        ->and(strlen($queued))->toBeLessThan(256 * 1024)
+        ->and(mb_check_encoding($payload['files']['stacktrace.txt'], 'UTF-8'))->toBeTrue();
+})->with([
+    '4-byte characters' => [str_repeat('😀', 80_000)],
+    'escape-heavy (backslashes, newlines)' => [str_repeat("\\\n", 100_000)],
+    'invalid UTF-8' => [str_repeat("\xB1", 100_000)],
+]);
+
+it('attaches nothing when disabled, in none mode or without an exception', function (array $overrides, array $context) {
+    $converter = new RichRecordConverter(array_replace(config('discord-logger'), $overrides));
+
+    $payload = $converter->convert(record('boom', $context));
+
+    expect($payload)->not->toHaveKey('files');
+})->with([
+    'attach disabled' => [['attach_stacktrace' => false], ['exception' => new RuntimeException('x')]],
+    'stacktrace none' => [['stacktrace' => 'none'], ['exception' => new RuntimeException('x')]],
+    'no exception' => [[], ['order' => 7]],
+]);
 
 it('drops vendor frames from the stacktrace in smart mode', function () {
     $config = config('discord-logger');

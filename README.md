@@ -116,6 +116,10 @@ Each message says where it came from, as extra embed fields (turn off with `DISC
 
 Anything in the record's `extra` — e.g. data added with Laravel's `Context::add()`, or Monolog processors — is shown in an **Extra** field. All of it goes through redaction, so `?token=...` in a URL is masked.
 
+### Full stacktrace attachment
+
+The embed shows at most 1000 characters of stacktrace (vendor frames dropped in `smart` mode). When the exception is longer, the whole thing — message, every frame and each chained previous exception, redacted — is also sent as a `stacktrace.txt` attachment, so nothing is lost to truncation. Disable with `DISCORD_LOGGER_ATTACH_STACKTRACE=false`; it's also skipped when `stacktrace` is `none`. The file is capped at 64 KiB to keep the queued job under SQS's 256 KiB limit.
+
 ### Context redaction
 
 Sensitive data is masked before it ever reaches Discord, via two complementary strategies:
