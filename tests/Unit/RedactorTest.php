@@ -110,6 +110,17 @@ it('redacts colon-delimited sensitive values via the default pattern', function 
     'trace frame untouched' => ['#0 /app/TokenService.php(12): App\\TokenService->refresh()', '#0 /app/TokenService.php(12): App\\TokenService->refresh()'],
 ]);
 
+it('always masks a Discord webhook token, even with no patterns configured', function (string $url, string $masked) {
+    $redactor = new Redactor([]);
+
+    expect($redactor->scrubString("failed for {$url}"))->toBe("failed for {$masked}")
+        ->and($redactor->scrub(['url' => $url]))->toBe(['url' => $masked]);
+})->with([
+    'discord.com' => ['https://discord.com/api/webhooks/123/aB-c_D', 'https://discord.com/api/webhooks/123/[REDACTED]'],
+    'discordapp.com' => ['https://discordapp.com/api/webhooks/123/aB-c_D', 'https://discordapp.com/api/webhooks/123/[REDACTED]'],
+    'versioned API, ptb' => ['https://ptb.discord.com/api/v10/webhooks/123/aB-c_D', 'https://ptb.discord.com/api/v10/webhooks/123/[REDACTED]'],
+]);
+
 it('redacts a short Basic credential via the default pattern', function () {
     $redactor = Redactor::fromConfig(config('discord-logger'));
 

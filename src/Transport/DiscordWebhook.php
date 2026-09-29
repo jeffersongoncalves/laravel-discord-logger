@@ -18,13 +18,12 @@ class DiscordWebhook
         $files = $payload['files'] ?? [];
         unset($payload['files']);
 
-        if (! is_array($files) || $files === []) {
-            return Http::asJson()
-                ->timeout(10)
-                ->post($url, $payload);
-        }
+        $request = Http::timeout((int) config('discord-logger.timeout', 10))
+            ->connectTimeout((int) config('discord-logger.connect_timeout', 5));
 
-        $request = Http::timeout(10);
+        if (! is_array($files) || $files === []) {
+            return $request->asJson()->post($url, $payload);
+        }
 
         foreach (array_keys($files) as $i => $name) {
             $request->attach("files[{$i}]", (string) $files[$name], (string) $name, ['Content-Type' => 'text/plain; charset=utf-8']);

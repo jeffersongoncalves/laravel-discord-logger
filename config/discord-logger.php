@@ -166,6 +166,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | HTTP timeouts (seconds)
+    |--------------------------------------------------------------------------
+    |
+    | When Discord is unreachable, queued delivery retries with backoff (10s,
+    | 30s, 60s, 120s) and then gives up quietly — the failure goes only to the
+    | fallback channel, never back to Discord, with the webhook token masked.
+    |
+    */
+    'timeout' => (int) env('DISCORD_LOGGER_TIMEOUT', 10),
+    'connect_timeout' => (int) env('DISCORD_LOGGER_CONNECT_TIMEOUT', 5),
+
+    /*
+    |--------------------------------------------------------------------------
     | Error grouping (fingerprint)
     |--------------------------------------------------------------------------
     |

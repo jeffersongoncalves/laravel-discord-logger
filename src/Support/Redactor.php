@@ -20,6 +20,13 @@ namespace JeffersonGoncalves\DiscordLogger\Support;
 class Redactor
 {
     /**
+     * Discord webhook token (the path segment after the webhook id). Always
+     * applied, not a config pattern: this package's own failures carry the
+     * webhook URL, and apps with an older published config must be covered.
+     */
+    private const WEBHOOK_TOKEN = '#(?<safe>discord(?:app)?\.com/api(?:/v\d+)?/webhooks/\d+/)[\w-]+#i';
+
+    /**
      * @param  array<int, string>  $keys  case-insensitive key fragments to redact
      * @param  array<int, string>  $valuePatterns  regexes matched against scalar values
      */
@@ -57,11 +64,7 @@ class Redactor
      */
     public function scrubString(string $value): string
     {
-        if ($this->valuePatterns === []) {
-            return $value;
-        }
-
-        foreach ($this->valuePatterns as $pattern) {
+        foreach ([self::WEBHOOK_TOKEN, ...$this->valuePatterns] as $pattern) {
             if ($pattern === '') {
                 continue;
             }
@@ -86,10 +89,6 @@ class Redactor
      */
     public function scrub(array $data): array
     {
-        if ($this->keys === [] && $this->valuePatterns === []) {
-            return $data;
-        }
-
         $scrubbed = [];
 
         foreach ($data as $key => $value) {
