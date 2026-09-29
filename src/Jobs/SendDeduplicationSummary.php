@@ -3,7 +3,7 @@
 namespace JeffersonGoncalves\DiscordLogger\Jobs;
 
 use JeffersonGoncalves\DiscordLogger\Support\Deduplicator;
-use JeffersonGoncalves\DiscordLogger\Transport\DiscordWebhook;
+use JeffersonGoncalves\DiscordLogger\Support\MessageDispatcher;
 
 /**
  * Runs when a dedup window closes. If the error fired more than once, it posts a
@@ -11,8 +11,6 @@ use JeffersonGoncalves\DiscordLogger\Transport\DiscordWebhook;
  */
 class SendDeduplicationSummary extends DiscordJob
 {
-    public int $tries = 3;
-
     /**
      * @param  array<string, mixed>  $config
      */
@@ -24,7 +22,7 @@ class SendDeduplicationSummary extends DiscordJob
         public array $config,
     ) {}
 
-    public function handle(DiscordWebhook $transport): void
+    public function handle(): void
     {
         // Build from the carried config: Deduplicator requires `array $config`,
         // which the container cannot autowire on the queue worker.
@@ -49,6 +47,10 @@ class SendDeduplicationSummary extends DiscordJob
             ]],
         ];
 
-        $transport->send($this->webhook, $payload);
+        // Hand off instead of sending here: the counter is already forgotten (it
+        // opens the next window), so a retry of THIS job would find nothing to
+        // report. SendDiscordMessage carries the built payload through its own
+        // retries/backoff.
+        (new MessageDispatcher($this->config))->queue(new SendDiscordMessage($this->webhook, $payload));
     }
 }

@@ -2,12 +2,12 @@
 
 namespace JeffersonGoncalves\DiscordLogger\Handlers;
 
-use Illuminate\Support\Facades\Log;
 use JeffersonGoncalves\DiscordLogger\Converters\Converter;
 use JeffersonGoncalves\DiscordLogger\Converters\RichRecordConverter;
 use JeffersonGoncalves\DiscordLogger\Jobs\SendDeduplicationSummary;
 use JeffersonGoncalves\DiscordLogger\Support\Deduplicator;
 use JeffersonGoncalves\DiscordLogger\Support\DiscordRateLimiter;
+use JeffersonGoncalves\DiscordLogger\Support\Fallback;
 use JeffersonGoncalves\DiscordLogger\Support\Fingerprinter;
 use JeffersonGoncalves\DiscordLogger\Support\MessageDispatcher;
 use JeffersonGoncalves\DiscordLogger\Support\RuntimeContext;
@@ -197,13 +197,8 @@ class DiscordHandler extends AbstractProcessingHandler
 
     private function reportFailure(Throwable $e): void
     {
-        $channel = $this->config['fallback_channel'] ?? null;
-
-        if (! is_string($channel) || $channel === '') {
-            return; // No fallback configured — stay silent rather than risk a loop.
-        }
-
-        // Safe: $handling is still true here, so this cannot re-enter the handler.
-        Log::channel($channel)->warning('Discord logger delivery failed: '.$e->getMessage());
+        // Redacted (the message can carry the webhook URL and token), and
+        // skipped when the fallback would route back into Discord.
+        Fallback::report($this->config, $e->getMessage());
     }
 }

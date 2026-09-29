@@ -80,7 +80,7 @@ Within `deduplication.window` seconds, only the **first** occurrence of a finger
 
 ### Async delivery
 
-Delivery runs through a queued job by default (`queue.enabled`). Discord 429s are retried respecting `Retry-After`; bad webhooks (4xx) fail fast instead of looping. Set `queue.enabled => false` to send inline (best-effort, errors swallowed).
+Delivery runs through a queued job by default (`queue.enabled`). Discord 429s are retried respecting `Retry-After`; an unreachable Discord (DNS/connect/timeout) or a 5xx is retried with backoff (10s, 30s, 60s, 120s); bad webhooks (4xx) fail fast instead of looping. After the last attempt the job gives up quietly — the delivery job never throws, so a Discord outage can't produce Discord messages about itself. Tune `timeout` / `connect_timeout` (seconds). Set `queue.enabled => false` to send inline (best-effort, errors swallowed).
 
 > **This means a queue worker must be running** (`php artisan queue:work`, Horizon, or supervisor) for `Log::debug/info/error(...)` calls to actually reach Discord. `discord-logger:test` sends inline and bypasses the queue entirely, so it will succeed even with no worker running — don't use it alone to confirm real logging works. If you don't run a worker (or don't want to), set `DISCORD_LOGGER_QUEUE=false`.
 
@@ -129,7 +129,9 @@ Sensitive data is masked before it ever reaches Discord, via two complementary s
 
 ### Fallback channel & safety
 
-The handler **never throws** and is guarded against logging-while-logging recursion. If delivery throws, the error is swallowed; set `fallback_channel` (e.g. `'single'`) to record those failures instead of losing them.
+The handler **never throws** and is guarded against logging-while-logging recursion. If delivery fails (inline, or after the queued job's last retry), the error is swallowed; set `fallback_channel` (e.g. `'single'`) to record those failures instead of losing them. The fallback message is redacted, and a fallback channel that reaches Discord (the Discord channel itself, or a stack containing it) is ignored so a failure can't loop.
+
+The Discord webhook token (`/api/webhooks/{id}/{token}`) is **always** masked by the redactor — in fallback messages, `discord-logger:test` output and anything sent to Discord — independently of `redact_value_patterns`, so it's covered even with an older published config.
 
 ## Troubleshooting
 

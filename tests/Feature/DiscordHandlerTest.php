@@ -180,12 +180,15 @@ it('records the failure to the fallback channel when delivery throws', function 
     config()->set('discord-logger.fallback_channel', 'fallbacktest');
 
     Http::fake(function () {
-        throw new RuntimeException('network down');
+        throw new RuntimeException('network down for https://discord.com/api/webhooks/123/sEcReT-ToKeN');
     });
 
     Log::channel('discord')->error('boom');
 
-    expect(file_get_contents($path))->toContain('Discord logger delivery failed');
+    expect(file_get_contents($path))
+        ->toContain('Discord logger delivery failed: network down')
+        ->toContain('webhooks/123/[REDACTED]')
+        ->not->toContain('sEcReT-ToKeN');
 
     @unlink($path);
 });

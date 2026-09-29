@@ -5,6 +5,7 @@ namespace JeffersonGoncalves\DiscordLogger\Commands;
 use DateTimeImmutable;
 use Illuminate\Console\Command;
 use JeffersonGoncalves\DiscordLogger\Converters\RichRecordConverter;
+use JeffersonGoncalves\DiscordLogger\Support\Redactor;
 use JeffersonGoncalves\DiscordLogger\Transport\DiscordWebhook;
 use Monolog\Level;
 use Monolog\LogRecord;
@@ -38,7 +39,8 @@ class TestCommand extends Command
         try {
             $response = $transport->send($url, $payload);
         } catch (Throwable $e) {
-            $this->components->error('Delivery failed: '.$e->getMessage());
+            // The message carries the webhook URL — never print its token.
+            $this->components->error('Delivery failed: '.Redactor::fromConfig((array) config('discord-logger', []))->scrubString($e->getMessage()));
 
             return self::FAILURE;
         }
