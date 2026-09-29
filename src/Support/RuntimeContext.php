@@ -3,12 +3,16 @@
 namespace JeffersonGoncalves\DiscordLogger\Support;
 
 use Closure;
+use Illuminate\Console\Events\CommandFinished;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Contracts\Queue\Job;
 use Illuminate\Foundation\Http\Events\RequestHandled;
+use Illuminate\Queue\Events\JobExceptionOccurred;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Events\Looping;
+use Illuminate\Queue\Jobs\SyncJob;
 use Throwable;
 
 /**
@@ -28,9 +32,22 @@ class RuntimeContext
     /** An Octane request is in flight (Octane runs HTTP under the CLI SAPI). */
     private static bool $octaneRequest = false;
 
+    /**
+     * Artisan commands running, innermost last (Artisan::call() nests).
+     *
+     * @var list<string>
+     */
+    private static array $commands = [];
+
     public static function listen(Dispatcher $events): void
     {
         $events->listen(JobProcessing::class, function (JobProcessing $event): void {
+            // Only a sync job can run nested; any other job is top-level, so
+            // whatever is still stacked (a worker job that failed) is over.
+            if (! $event->job instanceof SyncJob) {
+                self::$jobs = [];
+            }
+
             self::$jobs[] = [
                 'ref' => spl_object_id($event->job),
                 'data' => [
@@ -43,13 +60,26 @@ class RuntimeContext
             ];
         });
 
-        // Success: pop back to the parent job. Failure pops nothing — the worker
-        // reports a job's exception AFTER every job event has fired, and that log
-        // is the one that most needs to say which job it came from. Leftovers are
-        // popped with their parent, or reset at the next request/worker loop.
-        // ponytail: a failed nested job whose exception the parent catches keeps
-        // tagging the parent's later logs until the parent finishes.
+        // Success: pop back to the parent job.
         $events->listen(JobProcessed::class, fn (JobProcessed $event) => self::pop($event->job));
+
+        // Failure of a sync job: its exception is rethrown to the caller, which
+        // reports or handles it in its own scope — so pop now. A worker job's
+        // failure pops nothing: the worker reports the exception AFTER every job
+        // event fired, and that log must say which job failed. It is dropped
+        // when the next worker job starts, or at the next request/worker loop.
+        $events->listen(JobExceptionOccurred::class, function (JobExceptionOccurred $event): void {
+            if ($event->job instanceof SyncJob) {
+                self::pop($event->job);
+            }
+        });
+
+        $events->listen(CommandStarting::class, function (CommandStarting $event): void {
+            self::$commands[] = (string) $event->command;
+        });
+        $events->listen(CommandFinished::class, function (): void {
+            array_pop(self::$commands);
+        });
 
         $events->listen([Looping::class, RequestHandled::class], function (): void {
             self::$jobs = [];
@@ -121,8 +151,9 @@ class RuntimeContext
     }
 
     /**
-     * The script and command name only — never the arguments: a positional or
-     * space-separated value (`--password hunter2`) can't be redacted reliably.
+     * The command name as Artisan resolved it, else just the script name —
+     * never parsed from argv: an option value (`--password hunter2 user:create`)
+     * can't be told apart from the command name without the command's definition.
      *
      * @return array<string, string>|null
      */
@@ -132,16 +163,13 @@ class RuntimeContext
             return null;
         }
 
-        $argv = $_SERVER['argv'] ?? null;
-
-        if (! is_array($argv) || $argv === []) {
-            return null;
+        if (self::$commands !== []) {
+            return ['command' => self::$commands[array_key_last(self::$commands)]];
         }
 
-        $argv = array_map('strval', $argv);
-        $name = current(array_filter(array_slice($argv, 1), fn ($arg) => ! str_starts_with($arg, '-')));
+        $script = $_SERVER['argv'][0] ?? null;
 
-        return ['command' => trim(basename($argv[0]).' '.($name ?: ''))];
+        return is_string($script) && $script !== '' ? ['command' => basename($script)] : null;
     }
 
     /**

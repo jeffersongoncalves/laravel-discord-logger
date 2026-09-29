@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Console\Events\CommandFinished;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Contracts\Queue\Job;
 use Illuminate\Http\Client\Request;
 use Illuminate\Queue\Events\JobExceptionOccurred;
@@ -7,11 +9,14 @@ use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Events\Looping;
+use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
 
 beforeEach(function () {
     config()->set('discord-logger.queue.enabled', false);
@@ -103,16 +108,14 @@ it('forgets the job once it was processed', function () {
     expect(sentFields())->not->toHaveKey('Job')->toHaveKey('Command');
 });
 
+function syncJob(): SyncJob
+{
+    return new SyncJob(app(), json_encode(['displayName' => 'App\\Jobs\\SendReceipt', 'job' => 'x']), 'sync', 'default');
+}
+
 it('restores the outer job after a nested sync job finishes', function () {
     $outer = fakeJob();
-    $inner = Mockery::mock(Job::class);
-    $inner->allows([
-        'resolveName' => 'App\\Jobs\\SendReceipt',
-        'getQueue' => 'default',
-        'attempts' => 1,
-        'getJobId' => '',
-        'payload' => [],
-    ]);
+    $inner = syncJob();
 
     event(new JobProcessing('redis', $outer));
     event(new JobProcessing('sync', $inner));
@@ -125,6 +128,52 @@ it('restores the outer job after a nested sync job finishes', function () {
         ->not->toContain('SendReceipt');
 });
 
+it('restores the outer job after a nested sync job fails and the parent catches it', function () {
+    $inner = syncJob();
+
+    event(new JobProcessing('redis', fakeJob()));
+    event(new JobProcessing('sync', $inner));
+    event(new JobExceptionOccurred('sync', $inner, new RuntimeException('x')));
+
+    Log::channel('discord')->error('parent carries on');
+
+    expect(sentFields()['Job'])
+        ->toContain('App\\Jobs\\ChargeOrder')
+        ->not->toContain('SendReceipt');
+});
+
+it('drops a failed top-level sync job once its exception leaves it', function () {
+    $job = syncJob();
+
+    event(new JobProcessing('sync', $job));
+    event(new JobExceptionOccurred('sync', $job, new RuntimeException('x')));
+
+    Log::channel('discord')->error('caller carries on');
+
+    expect(sentFields())->not->toHaveKey('Job')->toHaveKey('Command');
+});
+
+it('drops a failed worker job when the next worker job starts', function () {
+    $failed = fakeJob();
+    $next = Mockery::mock(Job::class);
+    $next->allows([
+        'resolveName' => 'App\\Jobs\\NextJob',
+        'getQueue' => 'default',
+        'attempts' => 1,
+        'getJobId' => 'job-43',
+        'payload' => [],
+    ]);
+
+    event(new JobProcessing('redis', $failed));
+    event(new JobFailed('redis', $failed, new RuntimeException('x')));
+    event(new JobProcessing('redis', $next));
+    event(new JobProcessed('redis', $next));
+
+    Log::channel('discord')->error('between jobs');
+
+    expect(sentFields())->not->toHaveKey('Job');
+});
+
 it('treats an Octane request as HTTP even under the CLI SAPI, before routing', function () {
     event('Laravel\Octane\Events\RequestReceived');
 
@@ -133,18 +182,33 @@ it('treats an Octane request as HTTP even under the CLI SAPI, before routing', f
     expect(sentFields())->toHaveKey('Request')->not->toHaveKey('Command');
 });
 
-it('reports only the command name, never its arguments', function () {
+it('reports the command name Artisan resolved, never its arguments', function () {
     $argv = $_SERVER['argv'];
-    $_SERVER['argv'] = ['artisan', '--no-interaction', 'user:create', '--password', 'hunter2', 'positional-secret'];
+    $_SERVER['argv'] = ['artisan', '--password', 'hunter2', 'user:create', 'positional-secret'];
+    event(new CommandStarting('user:create', new ArrayInput([]), new NullOutput));
 
     try {
         Log::channel('discord')->error('from a command');
     } finally {
+        event(new CommandFinished('user:create', new ArrayInput([]), new NullOutput, 0));
         $_SERVER['argv'] = $argv;
     }
 
-    expect(sentFields()['Command'])
-        ->toBe('**command:** `artisan user:create`');
+    expect(sentFields()['Command'])->toBe('**command:** `user:create`');
+});
+
+it('falls back to the script name alone, never parsing argv', function () {
+    $argv = $_SERVER['argv'];
+    // An option value before the command name: parsing argv would pick "hunter2".
+    $_SERVER['argv'] = ['artisan', '--password', 'hunter2', 'user:create'];
+
+    try {
+        Log::channel('discord')->error('outside artisan events');
+    } finally {
+        $_SERVER['argv'] = $argv;
+    }
+
+    expect(sentFields()['Command'])->toBe('**command:** `artisan`');
 });
 
 it('omits runtime context when disabled', function () {
