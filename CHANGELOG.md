@@ -2,6 +2,18 @@
 
 All notable changes to `laravel-discord-logger` will be documented in this file.
 
+## v2.0.3 - 2026-09-29
+
+### Fixed
+
+- Accented characters in the log context are no longer escaped as `\uXXXX` in the Discord embed (`Não` stayed `N\u00e3o`). Context values with invalid UTF-8 now render with `�` instead of becoming `null`. (#15)
+
+### Maintenance
+
+- Standardized CI: tests workflow, update-changelog workflow, Dependabot config, and auto-merge for github-actions minor/patch updates only.
+
+**Full Changelog**: https://github.com/jeffersongoncalves/laravel-discord-logger/compare/v2.0.2...v2.0.3
+
 ## v2.0.2 - 2026-09-21
 
 ### Fixed
