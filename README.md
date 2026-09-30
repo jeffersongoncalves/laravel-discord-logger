@@ -111,8 +111,32 @@ Route a level to its own channel and ping someone when it matters:
 Each message says where it came from, as extra embed fields (turn off with `DISCORD_LOGGER_RUNTIME_CONTEXT=false`):
 
 - **Request** — method, URL, route name, user id (only if already resolved — logging never triggers a user lookup) and IP
+- **Livewire** — on a Livewire update request (which always hits `/livewire/update`), the component name(s) it targeted and the page path, read from the component snapshots
 - **Job** — class, queue, connection, attempt and id of the queued job being processed, including when the log is the job's own failure
 - **Command** — the artisan command name (never its arguments, which may carry secrets), for console logs outside a job
+
+To add your own fields — the tenant, the user kept in the session... — point `context_resolver` in `config/discord-logger.php` to an invokable class. It runs at log time; each key becomes an embed field (a scalar, or an array shown as `key: value` lines), redacted like the rest. It works with `runtime_context` off too, and a resolver that throws only costs its own fields:
+
+```php
+// config/discord-logger.php
+'context_resolver' => App\Logging\DiscordContext::class,
+
+// app/Logging/DiscordContext.php
+class DiscordContext
+{
+    public function __invoke(): array
+    {
+        if (! session('logged_in')) {
+            return ['User' => 'Guest'];
+        }
+
+        return [
+            'Company' => session('company.name'),
+            'User' => ['id' => session('user_id'), 'name' => session('user_name')],
+        ];
+    }
+}
+```
 
 Anything in the record's `extra` — e.g. data added with Laravel's `Context::add()`, or Monolog processors — is shown in an **Extra** field. All of it goes through redaction, so `?token=...` in a URL is masked.
 

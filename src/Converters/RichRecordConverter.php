@@ -157,6 +157,8 @@ class RichRecordConverter implements Converter
         foreach (is_array($runtime) ? $runtime : [] as $name => $data) {
             if (is_array($data) && $data !== []) {
                 $fields[] = $this->field(ucfirst((string) $name), $this->lines($this->redactor->scrub($data)));
+            } elseif (is_scalar($data) && $data !== '') {
+                $fields[] = $this->field(ucfirst((string) $name), '`'.str_replace('`', "'", $this->redactor->scrubString((string) $data)).'`');
             }
         }
 

@@ -78,6 +78,37 @@ it('adds the HTTP request the log came from, redacted', function () {
         ->not->toContain('abc123');
 });
 
+it('names the Livewire component a /livewire/update request targeted', function () {
+    Route::post('/livewire/update', function () {
+        Log::channel('discord')->error('component blew up');
+
+        return 'ok';
+    })->name('livewire.update');
+
+    $snapshot = fn (string $name) => json_encode(['data' => [], 'memo' => ['name' => $name, 'path' => 'financeiro/boletos']]);
+
+    $this->postJson('/livewire/update', ['components' => [
+        ['snapshot' => $snapshot('boletos.table'), 'updates' => [], 'calls' => []],
+        ['snapshot' => $snapshot('boletos.filters'), 'updates' => [], 'calls' => []],
+    ]])->assertOk();
+
+    expect(sentFields()['Livewire'] ?? '')
+        ->toContain('**component:** `boletos.table, boletos.filters`')
+        ->toContain('**path:** `financeiro/boletos`');
+});
+
+it('omits Livewire for a regular request', function () {
+    Route::post('/orders', function () {
+        Log::channel('discord')->error('plain post');
+
+        return 'ok';
+    });
+
+    $this->postJson('/orders', ['components' => 'not livewire'])->assertOk();
+
+    expect(sentFields())->toHaveKey('Request')->not->toHaveKey('Livewire');
+});
+
 it('adds the queued job the log came from and keeps it through a failure', function () {
     $job = fakeJob();
 
@@ -217,6 +248,47 @@ it('omits runtime context when disabled', function () {
     Log::channel('discord')->error('quiet');
 
     expect(sentFields())->not->toHaveKey('Command');
+});
+
+class SessionDiscordContext
+{
+    public function __invoke(): array
+    {
+        return [
+            'Empresa' => 'ACME Ltda',
+            'Usuário' => ['id' => 293, 'name' => 'Maria', 'password' => 'hunter2'],
+        ];
+    }
+}
+
+it('adds the fields of a custom context resolver, redacted', function () {
+    config()->set('discord-logger.context_resolver', SessionDiscordContext::class);
+
+    Log::channel('discord')->error('with custom context');
+
+    expect(sentFields())
+        ->toHaveKey('Command')
+        ->and(sentFields()['Empresa'])->toBe('`ACME Ltda`')
+        ->and(sentFields()['Usuário'])
+        ->toContain('**id:** `293`')
+        ->toContain('**name:** `Maria`')
+        ->not->toContain('hunter2');
+});
+
+it('keeps the custom context with runtime context off, and survives a failing resolver', function () {
+    config()->set('discord-logger.runtime_context', false);
+    config()->set('discord-logger.context_resolver', SessionDiscordContext::class);
+
+    Log::channel('discord')->error('custom only');
+
+    expect(sentFields())->toHaveKey('Empresa')->not->toHaveKey('Command');
+
+    Http::fake();
+    app()->bind(SessionDiscordContext::class, fn () => fn () => throw new RuntimeException('session gone'));
+
+    Log::channel('discord')->error('resolver throws');
+
+    expect(sentFields())->not->toHaveKey('Empresa');
 });
 
 it('renders Laravel Context data as an Extra field', function () {

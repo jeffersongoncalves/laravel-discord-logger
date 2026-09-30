@@ -101,6 +101,14 @@ return [
     'runtime_context' => env('DISCORD_LOGGER_RUNTIME_CONTEXT', true),
 
     /*
+    | Your own fields, resolved at log time: an invokable class (resolved from
+    | the container) returning ['Field name' => value|array, ...]. Each key
+    | becomes an embed field, redacted like the rest. Works with
+    | runtime_context off too. e.g. App\Logging\DiscordContext::class
+    */
+    'context_resolver' => null,
+
+    /*
     |--------------------------------------------------------------------------
     | Fallback channel
     |--------------------------------------------------------------------------
