@@ -2,6 +2,16 @@
 
 All notable changes to `laravel-discord-logger` will be documented in this file.
 
+## v2.2.0 - 2026-09-30
+
+### What's new
+
+- **Livewire field**: a `/livewire/update` request now shows the component name(s) it targeted and the page path, read from the component snapshots.
+- **Custom context resolver**: set `context_resolver` in `config/discord-logger.php` to an invokable class; each key it returns becomes an embed field (e.g. company/user from the session). Resolved at log time, redacted, works with `runtime_context` off, and a throwing resolver only drops its own fields.
+- Scalar runtime fields are now rendered by the rich converter.
+
+**Full Changelog**: https://github.com/jeffersongoncalves/laravel-discord-logger/compare/v2.1.0...v2.2.0
+
 ## v2.0.3 - 2026-09-29
 
 ### Fixed
