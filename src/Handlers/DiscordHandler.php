@@ -90,7 +90,12 @@ class DiscordHandler extends AbstractProcessingHandler
 
         // Captured here, synchronously, while the request/job is still live —
         // and only for records that will actually be sent.
-        if (($this->config['runtime_context'] ?? true) === true && ($runtime = $this->runtime->capture()) !== []) {
+        $runtime = [
+            ...(($this->config['runtime_context'] ?? true) === true ? $this->runtime->capture() : []),
+            ...$this->customContext(),
+        ];
+
+        if ($runtime !== []) {
             $record = $record->with(extra: [...$record->extra, 'runtime' => $runtime]);
         }
 
@@ -100,6 +105,38 @@ class DiscordHandler extends AbstractProcessingHandler
         $this->dispatcher->send($webhook, $payload);
 
         $this->scheduleSummary($webhook, $record, $fingerprint, $converter);
+    }
+
+    /**
+     * The app's own fields (tenant, logged-in user from the session...), from the
+     * `context_resolver` invokable. A class name rather than a closure so the
+     * config stays cacheable. A failing resolver costs its fields, never the log.
+     *
+     * @return array<string, mixed>
+     */
+    private function customContext(): array
+    {
+        $resolver = $this->config['context_resolver'] ?? null;
+
+        if ($resolver === null) {
+            return [];
+        }
+
+        try {
+            if (is_string($resolver) && class_exists($resolver)) {
+                $resolver = app($resolver);
+            }
+
+            $data = is_callable($resolver) ? $resolver() : null;
+        } catch (Throwable) {
+            return [];
+        }
+
+        return is_array($data) ? array_filter(
+            $data,
+            fn ($value, $key) => is_string($key) && (is_array($value) ? $value !== [] : is_scalar($value)),
+            ARRAY_FILTER_USE_BOTH,
+        ) : [];
     }
 
     /**

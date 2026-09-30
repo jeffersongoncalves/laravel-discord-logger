@@ -116,6 +116,7 @@ class RuntimeContext
 
         return array_filter([
             'request' => $request,
+            'livewire' => $request === null ? null : $this->attempt(fn () => $this->livewire()),
             'job' => $job,
             'command' => $request === null && $job === null ? $this->attempt(fn () => $this->command()) : null,
         ]);
@@ -147,6 +148,46 @@ class RuntimeContext
             // path — only report a user that was already resolved.
             'user' => $this->attempt(fn () => auth()->hasUser() ? auth()->id() : null),
             'ip' => $request->ip(),
+        ], fn ($v) => $v !== null && $v !== '');
+    }
+
+    /**
+     * A Livewire update request all goes to one URL (/livewire/update), so name
+     * the component(s) it targeted, read from each component's snapshot. Detected
+     * by payload, not route name: apps can move the update endpoint.
+     *
+     * @return array<string, string>|null
+     */
+    private function livewire(): ?array
+    {
+        $components = request()->input('components');
+
+        if (! is_array($components)) {
+            return null;
+        }
+
+        $names = [];
+        $path = null;
+
+        foreach ($components as $component) {
+            $snapshot = is_array($component) && is_string($component['snapshot'] ?? null)
+                ? json_decode($component['snapshot'], true)
+                : null;
+            $name = $snapshot['memo']['name'] ?? null;
+
+            if (is_string($name) && $name !== '') {
+                $names[] = $name;
+                $path ??= is_string($snapshot['memo']['path'] ?? null) ? $snapshot['memo']['path'] : null;
+            }
+        }
+
+        if ($names === []) {
+            return null;
+        }
+
+        return array_filter([
+            'component' => implode(', ', array_unique($names)),
+            'path' => $path,
         ], fn ($v) => $v !== null && $v !== '');
     }
 
