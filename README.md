@@ -1,6 +1,6 @@
 <div class="filament-hidden">
 
-![Laravel Discord Logger](https://raw.githubusercontent.com/jeffersongoncalves/laravel-discord-logger/master/art/jeffersongoncalves-laravel-discord-logger.png)
+![Laravel Discord Logger](https://raw.githubusercontent.com/jeffersongoncalves/laravel-discord-logger/main/art/jeffersongoncalves-laravel-discord-logger.png)
 
 </div>
 
@@ -9,7 +9,7 @@
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-FFDD00?style=flat-square&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/jeffersongoncalves)
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/jeffersongoncalves/laravel-discord-logger.svg?style=flat-square)](https://packagist.org/packages/jeffersongoncalves/laravel-discord-logger)
-[![Tests](https://img.shields.io/github/actions/workflow/status/jeffersongoncalves/laravel-discord-logger/tests.yml?branch=master&label=tests&style=flat-square)](https://github.com/jeffersongoncalves/laravel-discord-logger/actions/workflows/tests.yml)
+[![Tests](https://img.shields.io/github/actions/workflow/status/jeffersongoncalves/laravel-discord-logger/tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/jeffersongoncalves/laravel-discord-logger/actions/workflows/tests.yml)
 [![Total Downloads](https://img.shields.io/packagist/dt/jeffersongoncalves/laravel-discord-logger.svg?style=flat-square)](https://packagist.org/packages/jeffersongoncalves/laravel-discord-logger)
 [![License](https://img.shields.io/github/license/jeffersongoncalves/laravel-discord-logger?style=flat-square)](LICENSE.md)
 
