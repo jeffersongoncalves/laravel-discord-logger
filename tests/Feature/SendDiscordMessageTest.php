@@ -65,6 +65,25 @@ it('fails fast on a 4xx client error', function () {
     $job->handle(app(DiscordWebhook::class));
 });
 
+it('reports why Discord rejected the message to the fallback channel', function (mixed $body, string $reason) {
+    $path = fallbackLog();
+    Http::fake(['*' => Http::response($body, 404)]);
+    [$job, $queueJob] = queuedAt(1);
+
+    $queueJob->shouldReceive('fail')->once();
+
+    $job->handle(app(DiscordWebhook::class));
+
+    expect(file_get_contents($path))
+        ->toContain("Discord logger delivery failed: Discord responded with HTTP 404: {$reason}")
+        ->not->toContain('sEcReT-ToKeN_abc');
+
+    @unlink($path);
+})->with([
+    'Discord error JSON' => [['message' => 'Unknown Webhook', 'code' => 10015], 'Unknown Webhook'],
+    'non-JSON body' => ['not found', 'no message'],
+]);
+
 it('succeeds on a 2xx', function () {
     Http::fake(['*' => Http::response('', 204)]);
 

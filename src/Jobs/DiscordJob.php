@@ -57,8 +57,14 @@ abstract class DiscordJob implements ShouldQueue
             return;
         }
 
-        // 4xx (bad webhook, 404 deleted) — retrying can't help.
+        // 4xx (webhook deleted, bad token, invalid payload) — retrying can't help,
+        // but say why: Discord's message is the only clue to what broke.
         if ($response->clientError()) {
+            Fallback::report(
+                (array) config('discord-logger', []),
+                "Discord responded with HTTP {$response->status()}: ".($response->json('message') ?? 'no message'),
+            );
+
             $this->fail();
         }
     }

@@ -80,7 +80,7 @@ Within `deduplication.window` seconds, only the **first** occurrence of a finger
 
 ### Async delivery
 
-Delivery runs through a queued job by default (`queue.enabled`). Discord 429s are retried respecting `Retry-After`; an unreachable Discord (DNS/connect/timeout) or a 5xx is retried with backoff (10s, 30s, 60s, 120s); bad webhooks (4xx) fail fast instead of looping. After the last attempt the job gives up quietly — the delivery job never throws, so a Discord outage can't produce Discord messages about itself. Tune `timeout` / `connect_timeout` (seconds). Set `queue.enabled => false` to send inline (best-effort, errors swallowed).
+Delivery runs through a queued job by default (`queue.enabled`). Discord 429s are retried respecting `Retry-After`; an unreachable Discord (DNS/connect/timeout) or a 5xx is retried with backoff (10s, 30s, 60s, 120s); bad webhooks (4xx — deleted webhook, wrong token, invalid payload) fail fast instead of looping, and Discord's reason (e.g. `HTTP 404: Unknown Webhook`) is written to the fallback channel. After the last attempt the job gives up quietly — the delivery job never throws, so a Discord outage can't produce Discord messages about itself. Tune `timeout` / `connect_timeout` (seconds). Set `queue.enabled => false` to send inline (best-effort, errors swallowed).
 
 > **This means a queue worker must be running** (`php artisan queue:work`, Horizon, or supervisor) for `Log::debug/info/error(...)` calls to actually reach Discord. `discord-logger:test` sends inline and bypasses the queue entirely, so it will succeed even with no worker running — don't use it alone to confirm real logging works. If you don't run a worker (or don't want to), set `DISCORD_LOGGER_QUEUE=false`.
 
