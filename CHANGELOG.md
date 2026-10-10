@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-discord-logger` will be documented in this file.
 
+## v2.2.1 - 2026-10-10
+
+### Fixed
+
+- A 4xx from Discord (deleted webhook, wrong token, invalid payload) no longer fails silently: the status and Discord's message are written to the `fallback_channel` (redacted) before the job fails, e.g. `Discord responded with HTTP 404: Unknown Webhook`. Set `DISCORD_LOGGER_FALLBACK_CHANNEL=single` to see them.
+
+**Full Changelog**: https://github.com/jeffersongoncalves/laravel-discord-logger/compare/v2.2.0...v2.2.1
+
 ## v2.2.0 - 2026-09-30
 
 ### What's new
